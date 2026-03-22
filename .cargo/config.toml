@@ -1,0 +1,15 @@
+[build]
+target = "xtensa-esp32s3-espidf"
+
+[target.xtensa-esp32s3-espidf]
+linker = "ldproxy"
+runner = "espflash flash --monitor"
+rustflags = ["-C", "default-linker-libraries", "--cfg", "espidf_time64"]
+
+[env]
+CARGO_WORKSPACE_DIR = { value = "", relative = true }
+ESP_IDF_GLOB_PROJECT_BASE = { value = "", relative = true }
+ESP_IDF_GLOB_PROJECT_PARTITIONS = "partitions.csv"
+
+[unstable]
+build-std = ["std", "panic_abort"]

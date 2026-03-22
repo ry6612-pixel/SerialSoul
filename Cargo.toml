@@ -1,0 +1,60 @@
+# Novaclaw — ESP32-S3 Standalone AI Assistant
+# Natural language programming. No computer needed.
+#
+# Prerequisites: espup (cargo install espup; espup install)
+# Build: cargo build --release
+# Flash: espflash flash --monitor -p COM5 target/xtensa-esp32s3-espidf/release/esp32
+
+[package]
+name = "esp32"
+version = "1.0.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Novaclaw — Your $10 AI Assistant. Program by typing plain sentences. ESP32-S3 + Gemini. No computer needed."
+
+[patch.crates-io]
+esp-idf-sys = { git = "https://github.com/esp-rs/esp-idf-sys" }
+esp-idf-hal = { git = "https://github.com/esp-rs/esp-idf-hal" }
+esp-idf-svc = { git = "https://github.com/esp-rs/esp-idf-svc" }
+
+[dependencies]
+esp-idf-sys = { git = "https://github.com/esp-rs/esp-idf-sys" }
+esp-idf-svc = { git = "https://github.com/esp-rs/esp-idf-svc", features = ["std"] }
+esp-idf-hal = { git = "https://github.com/esp-rs/esp-idf-hal" }
+embedded-svc = "0.28"
+embedded-hal = "1.0"
+embedded-graphics = "0.8"
+display-interface-spi = "0.5"
+mipidsi = "0.8"
+embedded-io = "0.6"
+nanomp3 = "0.1.1"
+log = "0.4"
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+base64 = "0.22"
+
+[build-dependencies]
+embuild = { version = "0.33", features = ["espidf"] }
+
+[[package.metadata.esp-idf-sys.extra_components]]
+remote_component = { name = "espressif/esp32-camera", version = "2.1.5" }
+bindings_header = "camera_bindings.h"
+bindings_module = "camera"
+
+[[package.metadata.esp-idf-sys.extra_components]]
+remote_component = { name = "espressif/esp-sr", version = "^2.0.0" }
+bindings_header = "sr_bindings.h"
+bindings_module = "sr"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+
+[profile.dev]
+opt-level = "s"
+
+[workspace]

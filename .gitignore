@@ -1,0 +1,49 @@
+# Build output
+target/
+.embuild/
+
+# IDE
+.vscode/
+*.code-workspace
+
+# Cargo lock (optional for binaries, keep for reproducibility)
+# Cargo.lock
+
+# ESP-IDF generated
+components_esp32s3.lock
+
+# === SECRETS — NEVER COMMIT ===
+user_config.txt
+*.env
+
+# Temp/debug files
+*.txt
+!user_config.example.txt
+*.log
+*.py
+!build.rs
+
+# Bindings (auto-generated)
+camera_bindings.h
+sr_bindings.h
+
+# Scripts (local dev helpers)
+*.ps1
+!build.ps1
+!flash.ps1
+!setup-secure-config.ps1
+!pre-publish-scan.ps1
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Backups
+*.bak
+src/main_*.rs
+src/*.rs.v*
+*.corrupted
+
+# OTA artifacts
+ota_serve/
+Novaclaw-release.zip
