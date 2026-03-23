@@ -1,7 +1,23 @@
 <h1 align="center">
+  Novaclaw
 </h1>
 
 <h3 align="center">10ドルのマイコンで動く完全なAIアシスタント<br>サーバー不要・PC不要・コーディング不要 — WiFiだけ</h3>
+
+<p align="center">
+
+```mermaid
+graph LR
+    You[あなた] -->|Telegram| MCU["ESP32-S3 -- ¥1,500"]
+    MCU -->|HTTPS| Gemini[Gemini AI]
+    MCU --- Camera[カメラ]
+    MCU --- LCD
+    MCU --- Speaker[スピーカー]
+    MCU --- Mic[マイク]
+    MCU -->|USB| PC
+```
+
+</p>
 
 <p align="center">
   <a href="README.md">English</a> ·
@@ -40,25 +56,25 @@
 
 ## Novaclaw vs OpenClaw vs ZeroClaw
 
-Novaclaw は OpenClaw や ZeroClaw とは全く異なるカテゴリに属します。後者はデスクトップやクラウドで動作するサーバーサイド AI アシスタントプラットフォームですが、Novaclaw は $10 のマイコン上で直接動作するスタンドアロンファームウェアであり、サーバーは一切不要です。
+Novaclaw は OpenClaw や ZeroClaw とは全く異なるカテゴリに属します。後者は host OS が必要なソフトウェア AI プラットフォームです -- デスクトップ、Raspberry Pi、クラウド VM、または任意の Linux/macOS/Windows マシンで動作します。Novaclaw は OS なしのベアメタル MCU 上で直接動作するスタンドアロンファームウェアです。
 
-**核心的な違い：Novaclaw はデバイスそのもの。OpenClaw と ZeroClaw はデバイスを周辺機器として使用。**
+ZeroClaw の ESP32/Arduino サポートは **「ペリフェラルエージェント」** -- メインの ZeroClaw Gateway に接続するセンサーブリッジです。Novaclaw の ESP32 がシステム**そのもの**です。
 
 | | Novaclaw | ZeroClaw | OpenClaw |
 |---|---|---|---|
-| アーキテクチャ | MCU スタンドアロンファームウェア | デスクトップ/サーバー CLI/Gateway | デスクトップ/サーバー Node.js Gateway |
+| アーキテクチャ | MCU スタンドアロンファームウェア | CLI/Gateway バイナリ（host OS 必要） | Node.js Gateway（host OS 必要） |
 | 言語 | Rust (esp-idf) | Rust | TypeScript |
-| 動作環境 | ESP32-S3 (約1,500円のボード) | デスクトップ、SBC、クラウド | デスクトップ、サーバー |
-| サーバー必要 | 不要 | 自前 Gateway 必要 | 自前 Gateway 必要 |
+| 動作環境 | ESP32-S3 (約1,500円、ベアメタル) | 任意の OS 付きデバイス：Pi、SBC、デスクトップ、クラウド | デスクトップ、サーバー |
+| Host OS 必要 | 不要（ベアメタルファームウェア） | 必要（Linux/macOS/Windows） | 必要（Node.js ランタイム） |
 | メモリ | 8 MB (オンチップ PSRAM) | < 5 MB | > 1 GB |
 | バイナリサイズ | ~1.8 MB ファームウェア | ~8.8 MB | ~28 MB (dist) |
 | チャンネル | Telegram | 22+ チャンネル | 22+ チャンネル |
-| ハードウェア | 内蔵カメラ、LCD、スピーカー、マイク | ペリフェラル特性 (ESP32, RPi) | なし |
+| ハードウェア | 内蔵カメラ、LCD、スピーカー、マイク | ペリフェラル特性（ESP32 をブリッジとして） | なし |
 | スキル | 16 個オンデバイス | 70+ ツール + プラグイン | 5,400+ コミュニティ |
 | セットアップ | フラッシュ1回、USB でプロビジョニング | install.sh + onboard | Node.js + 設定 |
 
 **Novaclaw を選ぶ場面：**
-- サーバーなしで動作する自己完結型 AI デバイスが欲しい
+- host OS、サーバー、PC なしで動作する自己完結型 AI デバイスが欲しい
 - 物理センシングが必要：カメラビジョン、環境モニタリング、音声 I/O
 - 1,500円、待機 0.5W のエッジ AI が欲しい
 - コードを書かず、文章入力でオートメーションを作りたい
@@ -67,7 +83,7 @@ Novaclaw は OpenClaw や ZeroClaw とは全く異なるカテゴリに属しま
 - 22+ メッセージングチャンネルが必要（WhatsApp、Slack、Discord、Signal など）
 - 数千のコミュニティスキルを持つプラグインエコシステムが欲しい
 - マルチエージェント連携やブラウザ自動化が必要
-- Gateway を動かすサーバーやデスクトップを既に持っている
+- Gateway を動かす OS 付きのマシンを既に持っている
 
 ---
 
@@ -444,7 +460,7 @@ xiaozhi-esp32 は音声チャット特化。Novaclaw は自律エッジAI特化 
 </details>
 
 <details><summary><b>OpenClaw や ZeroClaw との違いは？</b></summary>
-OpenClaw と ZeroClaw はデスクトップやクラウドで動作するサーバーサイド AI プラットフォームで、22+ チャンネルに対応しています。Novaclaw は約1,500円の ESP32-S3 上で直接動作するスタンドアロンファームウェアです -- サーバー不要、PC不要、Docker不要。詳しくは上記の比較表をご覧ください。
+OpenClaw と ZeroClaw は host OS（デスクトップ、Raspberry Pi、クラウド VM など）が必要なソフトウェア AI プラットフォームで、22+ チャンネルに対応。ESP32 サポートはペリフェラルブリッジとして。Novaclaw は約1,500円の ESP32-S3 ベアメタル上で直接動作するスタンドアロンファームウェア -- OS不要、サーバー不要、Docker不要。詳しくは上記の比較表をご覧ください。
 </details>
 
 ---

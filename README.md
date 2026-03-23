@@ -1,7 +1,23 @@
 <h1 align="center">
+  Novaclaw
 </h1>
 
 <h3 align="center">A complete AI assistant running on a $10 microcontroller.<br>No server. No PC. No code. Just WiFi.</h3>
+
+<p align="center">
+
+```mermaid
+graph LR
+    You -->|Telegram| MCU["ESP32-S3 -- $10"]
+    MCU -->|HTTPS| Gemini[Gemini AI]
+    MCU --- Camera
+    MCU --- LCD
+    MCU --- Speaker
+    MCU --- Mic
+    MCU -->|USB| PC
+```
+
+</p>
 
 <p align="center">
   <a href="README.md"><b>English</b></a> ·
@@ -40,25 +56,25 @@
 
 ## Novaclaw vs OpenClaw vs ZeroClaw
 
-Novaclaw belongs to a different category than OpenClaw and ZeroClaw. Those are server-side AI assistant platforms that you run on a desktop or cloud instance. Novaclaw is standalone firmware that runs directly on a $10 microcontroller with zero server dependency.
+Novaclaw belongs to a different category than OpenClaw and ZeroClaw. Those are software AI platforms that require a host operating system -- a desktop, a Raspberry Pi, a cloud VM, or any Linux/macOS/Windows machine. Novaclaw is standalone firmware that runs directly on a bare MCU with no OS.
 
-**The core difference: Novaclaw IS the device. OpenClaw and ZeroClaw USE devices as peripherals.**
+ZeroClaw's ESP32/Arduino support is as a **peripheral agent** -- a sensor bridge that connects back to the main ZeroClaw gateway running on a host. Novaclaw's ESP32 **is** the entire system.
 
 | | Novaclaw | ZeroClaw | OpenClaw |
 |---|---|---|---|
-| Architecture | Standalone MCU firmware | CLI/Gateway on desktop/server | Node.js Gateway on desktop/server |
+| Architecture | Standalone MCU firmware | CLI/Gateway binary (needs host OS) | Node.js Gateway (needs host OS) |
 | Language | Rust (esp-idf) | Rust | TypeScript |
-| Runs on | ESP32-S3 ($10 board) | Desktop, SBC, cloud | Desktop, server |
-| Server required | None | Self-hosted gateway | Self-hosted gateway |
+| Runs on | ESP32-S3 ($10, bare metal) | Any OS: Pi, SBC, desktop, cloud | Desktop, server |
+| Host OS required | No (bare-metal firmware) | Yes (Linux/macOS/Windows) | Yes (Node.js runtime) |
 | RAM | 8 MB (on-chip PSRAM) | < 5 MB | > 1 GB |
 | Binary | ~1.8 MB firmware | ~8.8 MB | ~28 MB (dist) |
 | Channels | Telegram | 22+ channels | 22+ channels |
-| Hardware | Built-in camera, LCD, speaker, mic | Peripheral trait (ESP32, RPi) | None |
+| Hardware | Built-in camera, LCD, speaker, mic | Peripheral trait (ESP32 as bridge) | None |
 | Skills | 16 on-device | 70+ tools + plugins | 5,400+ community |
 | Setup | Flash once, provision via USB | install.sh + onboard wizard | Node.js + config |
 
 **Choose Novaclaw when you want:**
-- A self-contained AI device that works without any server or PC
+- A self-contained AI device that works without any host OS, server, or PC
 - Physical sensing: camera vision, environmental monitoring, voice I/O
 - Edge AI that costs $10 and draws 0.5W idle
 - Automations created by typing sentences, not writing code
@@ -67,7 +83,7 @@ Novaclaw belongs to a different category than OpenClaw and ZeroClaw. Those are s
 - 22+ messaging channels (WhatsApp, Slack, Discord, Signal, etc.)
 - A plugin ecosystem with thousands of community skills
 - Multi-agent orchestration or browser automation
-- A server or desktop you already have to run a gateway
+- You already have a machine with an OS to run the gateway
 
 ---
 
@@ -444,7 +460,7 @@ xiaozhi-esp32 focuses on voice chat. Novaclaw focuses on autonomous edge AI -- c
 </details>
 
 <details><summary><b>How is Novaclaw different from OpenClaw or ZeroClaw?</b></summary>
-OpenClaw and ZeroClaw are server-side AI platforms that run on a desktop or cloud instance and connect to 22+ messaging channels. Novaclaw is standalone firmware that runs directly on a $10 ESP32-S3 -- no server, no PC, no Docker. See the comparison table above for details.
+OpenClaw and ZeroClaw are software AI platforms that need a host OS (desktop, Raspberry Pi, cloud VM, etc.) and connect to 22+ messaging channels. Their ESP32 support is as a peripheral bridge. Novaclaw is standalone firmware that runs directly on a $10 ESP32-S3 bare-metal -- no OS, no server, no Docker. See the comparison table above for details.
 </details>
 
 ---
