@@ -9,7 +9,6 @@
 <h3 align="center">A complete AI assistant running on a $10 microcontroller.<br>No server. No PC. No code. Just WiFi.</h3>
 
 <p align="center">
-  <b>🌐</b>&nbsp;
   <a href="README.md"><b>English</b></a> ·
   <a href="README.zh-TW.md">繁體中文</a> ·
   <a href="README.ja.md">日本語</a>
@@ -17,8 +16,8 @@
 
 <p align="center">
   <a href="https://github.com/ry6612-pixel/Novaclaw/stargazers"><img src="https://img.shields.io/github/stars/ry6612-pixel/Novaclaw?style=for-the-badge&color=gold" alt="Stars"></a>&nbsp;
-  <a href="#-quick-start--5-minutes"><img src="https://img.shields.io/badge/⚡_Ready_in_5_min-blue?style=for-the-badge" /></a>&nbsp;
-  <a href="#-hardware"><img src="https://img.shields.io/badge/💰_~US$10-green?style=for-the-badge" /></a>&nbsp;
+  <a href="#quick-start--5-minutes"><img src="https://img.shields.io/badge/Ready_in_5_min-blue?style=for-the-badge" /></a>&nbsp;
+  <a href="#hardware"><img src="https://img.shields.io/badge/~US$10-green?style=for-the-badge" /></a>&nbsp;
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/License-MIT%2FApache--2.0-orange?style=for-the-badge" /></a>
 </p>
 
@@ -44,7 +43,40 @@
 
 ---
 
-## 📸 Live Demo
+## Novaclaw vs OpenClaw vs ZeroClaw
+
+Novaclaw belongs to a different category than OpenClaw and ZeroClaw. Those are server-side AI assistant platforms that you run on a desktop or cloud instance. Novaclaw is standalone firmware that runs directly on a $10 microcontroller with zero server dependency.
+
+**The core difference: Novaclaw IS the device. OpenClaw and ZeroClaw USE devices as peripherals.**
+
+| | Novaclaw | ZeroClaw | OpenClaw |
+|---|---|---|---|
+| Architecture | Standalone MCU firmware | CLI/Gateway on desktop/server | Node.js Gateway on desktop/server |
+| Language | Rust (esp-idf) | Rust | TypeScript |
+| Runs on | ESP32-S3 ($10 board) | Desktop, SBC, cloud | Desktop, server |
+| Server required | None | Self-hosted gateway | Self-hosted gateway |
+| RAM | 8 MB (on-chip PSRAM) | < 5 MB | > 1 GB |
+| Binary | ~1.8 MB firmware | ~8.8 MB | ~28 MB (dist) |
+| Channels | Telegram | 22+ channels | 22+ channels |
+| Hardware | Built-in camera, LCD, speaker, mic | Peripheral trait (ESP32, RPi) | None |
+| Skills | 16 on-device | 70+ tools + plugins | 5,400+ community |
+| Setup | Flash once, provision via USB | install.sh + onboard wizard | Node.js + config |
+
+**Choose Novaclaw when you want:**
+- A self-contained AI device that works without any server or PC
+- Physical sensing: camera vision, environmental monitoring, voice I/O
+- Edge AI that costs $10 and draws 0.5W idle
+- Automations created by typing sentences, not writing code
+
+**Choose ZeroClaw or OpenClaw when you need:**
+- 22+ messaging channels (WhatsApp, Slack, Discord, Signal, etc.)
+- A plugin ecosystem with thousands of community skills
+- Multi-agent orchestration or browser automation
+- A server or desktop you already have to run a gateway
+
+---
+
+## Live Demo
 
 > Real screenshots from Novaclaw running on a ~$10 ESP32-S3-N16R8 board.
 
@@ -104,39 +136,39 @@
 
 ---
 
-## ⭐ Key Features
+## Key Features
 
 | | Feature | Description |
 |---|---|---|
-| 🧠 | **Gemini AI Chat** | Full conversational AI with context memory, any language |
-| 📷 | **Camera Vision** | OV3660 snap + Gemini Vision — object detection, OCR, anomaly reports |
-| 🎙️ | **Voice I/O** | Speech-to-text, TTS playback, wake word detection (ESP-SR) |
-| 🖥️ | **PC Remote Control** | USB Serial → screenshots, shell, file ops, app launching |
-| 📅 | **Smart Scheduling** | Natural language task creation, daily reminders, recurring AutoTasks |
-| 🧰 | **16 AI Skills** | Code execution, image gen, Excel, email, calculator, translator |
-| 🖼️ | **LCD Display** | ST7789 screen — emoji faces, status, AI replies |
-| 🔄 | **OTA Updates** | Send .bin via Telegram to upgrade firmware wirelessly |
-| 📡 | **WiFi Auto-Recovery** | Dual-network failover, auto-reconnect, 120s health checks |
-| 💬 | **Natural Language Programming** | Create automations by typing plain sentences — no code |
-| 🔒 | **Security Controls** | PC Safe Mode, OTA HTTPS-only, stream token auth, chat log masking |
+| | **Gemini AI Chat** | Full conversational AI with context memory, any language |
+| | **Camera Vision** | OV3660 snap + Gemini Vision -- object detection, OCR, anomaly reports |
+| | **Voice I/O** | Speech-to-text, TTS playback, wake word detection (ESP-SR) |
+| | **PC Remote Control** | USB Serial -- screenshots, shell, file ops, app launching |
+| | **Smart Scheduling** | Natural language task creation, daily reminders, recurring AutoTasks |
+| | **16 AI Skills** | Code execution, image gen, Excel, email, calculator, translator |
+| | **LCD Display** | ST7789 screen -- status, AI replies |
+| | **OTA Updates** | Send .bin via Telegram to upgrade firmware wirelessly |
+| | **WiFi Auto-Recovery** | Dual-network failover, auto-reconnect, 120s health checks |
+| | **Natural Language Programming** | Create automations by typing plain sentences -- no code |
+| | **Security Controls** | PC Safe Mode, OTA HTTPS-only, stream token auth, chat log masking |
 
 ---
 
-## 🏗️ Use Cases
+## Use Cases
 
 | Scenario | How | Example |
 |----------|-----|---------|
-| 🏭 **Factory** | Scheduler + GPIO + AI vision | Defect screening, equipment monitoring |
-| 🏗️ **Construction** | Periodic photo + AI analysis | Hard-hat detection, zone alerts |
-| 🏠 **Smart Home** | Standalone intelligent unit | Door recognition, elderly safety |
-| 💻 **Remote Desktop** | USB-connected PC control | Screenshots, scripts, emails via Telegram |
-| 🏢 **Office** | Natural-language task management | Invoice scanning, auto-scheduling |
+| **Factory** | Scheduler + GPIO + AI vision | Defect screening, equipment monitoring |
+| **Construction** | Periodic photo + AI analysis | Hard-hat detection, zone alerts |
+| **Smart Home** | Standalone intelligent unit | Door recognition, elderly safety |
+| **Remote Desktop** | USB-connected PC control | Screenshots, scripts, emails via Telegram |
+| **Office** | Natural-language task management | Invoice scanning, auto-scheduling |
 
 ---
 
-<a id="-hardware"></a>
+<a id="hardware"></a>
 
-## 📦 Hardware
+## Hardware
 
 ### Core (Required) — ~$10
 
@@ -150,26 +182,26 @@
 
 | Module | Price | Enables |
 |--------|-------|---------|
-| 📷 OV3660 Camera | ~$3 | Camera snap, AI vision |
-| 🖥️ ST7789 LCD | ~$2 | Emoji face, status display |
-| 🔊 MAX98357 Speaker | ~$1 | TTS voice output |
-| 🎤 INMP441 Microphone | ~$1 | Voice input, wake word |
+| OV3660 Camera | ~$3 | Camera snap, AI vision |
+| ST7789 LCD | ~$2 | Status display |
+| MAX98357 Speaker | ~$1 | TTS voice output |
+| INMP441 Microphone | ~$1 | Voice input, wake word |
 
 **Full setup: ~$15** — complete AI assistant with camera, screen, voice, and speaker.
 
 ---
 
-<a id="-quick-start--5-minutes"></a>
+<a id="quick-start--5-minutes"></a>
 
-## ⚡ Quick Start — 5 Minutes
+## Quick Start — 5 Minutes
 
 ### Prerequisites
 
 | Key | Where to Get |
 |-----|-------------|
-| 🤖 **Telegram Bot Token** | [@BotFather](https://t.me/BotFather) → `/newbot` |
-| 🧠 **Gemini API Key** | [Google AI Studio](https://aistudio.google.com/apikey) |
-| 📶 **WiFi SSID + Password** | Your home/office WiFi |
+| **Telegram Bot Token** | [@BotFather](https://t.me/BotFather) -> `/newbot` |
+| **Gemini API Key** | [Google AI Studio](https://aistudio.google.com/apikey) |
+| **WiFi SSID + Password** | Your home/office WiFi |
 
 ### Build from Source
 
@@ -222,7 +254,7 @@ espup install
 
 ---
 
-## 🎮 Commands
+## Commands
 
 ### Core
 
@@ -292,7 +324,7 @@ espup install
 
 ---
 
-## 🏛️ Architecture
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -326,7 +358,7 @@ espup install
 ## Wiring
 
 <details>
-<summary><b>📷 OV3660 Camera (DVP)</b></summary>
+<summary><b>OV3660 Camera (DVP)</b></summary>
 
 | Pin | GPIO | | Pin | GPIO |
 |-----|------|-|-----|------|
@@ -343,7 +375,7 @@ espup install
 </details>
 
 <details>
-<summary><b>🖥️ ST7789 LCD (SPI)</b></summary>
+<summary><b>ST7789 LCD (SPI)</b></summary>
 
 RST=21, DC=47, BL=38, SCLK=19, MOSI=20, CS=45
 
@@ -352,7 +384,7 @@ RST=21, DC=47, BL=38, SCLK=19, MOSI=20, CS=45
 </details>
 
 <details>
-<summary><b>🔊 Speaker + 🎤 Mic (I2S)</b></summary>
+<summary><b>Speaker + Mic (I2S)</b></summary>
 
 **MAX98357:** BCLK=46, LRC=14, DIN=48
 **INMP441:** SCK=2, WS=1, SD=41
@@ -361,7 +393,7 @@ RST=21, DC=47, BL=38, SCLK=19, MOSI=20, CS=45
 
 ---
 
-## 🔑 Security
+## Security
 
 **Protected:**
 - **Zero secrets in binary** — credentials provisioned via USB serial into NVS, never compiled into firmware
@@ -383,7 +415,7 @@ RST=21, DC=47, BL=38, SCLK=19, MOSI=20, CS=45
 
 ---
 
-## 🚀 Release Checklist
+## Release Checklist
 
 Before making changes public:
 
@@ -413,22 +445,26 @@ Yes. Responds in whatever language you write.
 </details>
 
 <details><summary><b>What about xiaozhi-esp32?</b></summary>
-xiaozhi-esp32 focuses on voice chat. Novaclaw focuses on autonomous edge AI — camera vision, scheduling, PC control, and natural-language programming. Complementary projects.
+xiaozhi-esp32 focuses on voice chat. Novaclaw focuses on autonomous edge AI -- camera vision, scheduling, PC control, and natural-language programming. Complementary projects.
+</details>
+
+<details><summary><b>How is Novaclaw different from OpenClaw or ZeroClaw?</b></summary>
+OpenClaw and ZeroClaw are server-side AI platforms that run on a desktop or cloud instance and connect to 22+ messaging channels. Novaclaw is standalone firmware that runs directly on a $10 ESP32-S3 -- no server, no PC, no Docker. See the comparison table above for details.
 </details>
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
-PRs welcome! Fork → branch → commit → PR.
+PRs welcome! Fork -> branch -> commit -> PR.
 
 ---
 
-## 📄 License
+## License
 
 Dual-licensed under [MIT](LICENSE-MIT) / [Apache-2.0](LICENSE-APACHE).
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - **[Espressif](https://www.espressif.com/)** — ESP32-S3 chip and ESP-IDF framework
 - **[Google Gemini](https://ai.google.dev/)** — Multimodal AI API

@@ -9,7 +9,6 @@
 <h3 align="center">10ドルのマイコンで動く完全なAIアシスタント<br>サーバー不要・PC不要・コーディング不要 — WiFiだけ</h3>
 
 <p align="center">
-  <b>🌐</b>&nbsp;
   <a href="README.md">English</a> ·
   <a href="README.zh-TW.md">繁體中文</a> ·
   <a href="README.ja.md"><b>日本語</b></a>
@@ -17,8 +16,8 @@
 
 <p align="center">
   <a href="https://github.com/ry6612-pixel/Novaclaw/stargazers"><img src="https://img.shields.io/github/stars/ry6612-pixel/Novaclaw?style=for-the-badge&color=gold" alt="Stars"></a>&nbsp;
-  <a href="#-クイックスタート--5分"><img src="https://img.shields.io/badge/⚡_5分で開始-blue?style=for-the-badge" /></a>&nbsp;
-  <a href="#-ハードウェア"><img src="https://img.shields.io/badge/💰_約¥1,500-green?style=for-the-badge" /></a>&nbsp;
+  <a href="#クイックスタート--5分"><img src="https://img.shields.io/badge/5分で開始-blue?style=for-the-badge" /></a>&nbsp;
+  <a href="#ハードウェア"><img src="https://img.shields.io/badge/約¥1,500-green?style=for-the-badge" /></a>&nbsp;
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/License-MIT%2FApache--2.0-orange?style=for-the-badge" /></a>
 </p>
 
@@ -44,7 +43,40 @@
 
 ---
 
-## 📸 デモ
+## Novaclaw vs OpenClaw vs ZeroClaw
+
+Novaclaw は OpenClaw や ZeroClaw とは全く異なるカテゴリに属します。後者はデスクトップやクラウドで動作するサーバーサイド AI アシスタントプラットフォームですが、Novaclaw は $10 のマイコン上で直接動作するスタンドアロンファームウェアであり、サーバーは一切不要です。
+
+**核心的な違い：Novaclaw はデバイスそのもの。OpenClaw と ZeroClaw はデバイスを周辺機器として使用。**
+
+| | Novaclaw | ZeroClaw | OpenClaw |
+|---|---|---|---|
+| アーキテクチャ | MCU スタンドアロンファームウェア | デスクトップ/サーバー CLI/Gateway | デスクトップ/サーバー Node.js Gateway |
+| 言語 | Rust (esp-idf) | Rust | TypeScript |
+| 動作環境 | ESP32-S3 (約1,500円のボード) | デスクトップ、SBC、クラウド | デスクトップ、サーバー |
+| サーバー必要 | 不要 | 自前 Gateway 必要 | 自前 Gateway 必要 |
+| メモリ | 8 MB (オンチップ PSRAM) | < 5 MB | > 1 GB |
+| バイナリサイズ | ~1.8 MB ファームウェア | ~8.8 MB | ~28 MB (dist) |
+| チャンネル | Telegram | 22+ チャンネル | 22+ チャンネル |
+| ハードウェア | 内蔵カメラ、LCD、スピーカー、マイク | ペリフェラル特性 (ESP32, RPi) | なし |
+| スキル | 16 個オンデバイス | 70+ ツール + プラグイン | 5,400+ コミュニティ |
+| セットアップ | フラッシュ1回、USB でプロビジョニング | install.sh + onboard | Node.js + 設定 |
+
+**Novaclaw を選ぶ場面：**
+- サーバーなしで動作する自己完結型 AI デバイスが欲しい
+- 物理センシングが必要：カメラビジョン、環境モニタリング、音声 I/O
+- 1,500円、待機 0.5W のエッジ AI が欲しい
+- コードを書かず、文章入力でオートメーションを作りたい
+
+**ZeroClaw または OpenClaw を選ぶ場面：**
+- 22+ メッセージングチャンネルが必要（WhatsApp、Slack、Discord、Signal など）
+- 数千のコミュニティスキルを持つプラグインエコシステムが欲しい
+- マルチエージェント連携やブラウザ自動化が必要
+- Gateway を動かすサーバーやデスクトップを既に持っている
+
+---
+
+## デモ
 
 > 実機スクリーンショット — 約¥1,500 の ESP32-S3-N16R8 ボードで稼働中。
 
@@ -104,39 +136,39 @@
 
 ---
 
-## ⭐ 主な機能
+## 主な機能
 
 | | 機能 | 説明 |
 |---|---|---|
-| 🧠 | **Gemini AI チャット** | コンテキストメモリ付き対話AI、あらゆる言語対応 |
-| 📷 | **カメラビジョン** | OV3660 撮影 + Gemini Vision — 物体検出、OCR、異常レポート |
-| 🎙️ | **音声 I/O** | 音声認識、TTS再生、ウェイクワード検出 (ESP-SR) |
-| 🖥️ | **PCリモート制御** | USB Serial → スクリーンショット、シェル、ファイル操作、アプリ起動 |
-| 📅 | **スマートスケジューリング** | 自然言語タスク作成、毎日リマインダー、繰り返しAutoTask |
-| 🧰 | **16のAIスキル** | コード実行、画像生成、Excel、メール、電卓、翻訳 |
-| 🖼️ | **LCDディスプレイ** | ST7789 画面 — 絵文字、ステータス、AI応答表示 |
-| 🔄 | **OTAアップデート** | Telegram で .bin ファイルを送信してファームウェア更新 |
-| 📡 | **WiFi自動復旧** | デュアルネットワーク対応、自動再接続、120秒ヘルスチェック |
-| 💬 | **自然言語プログラミング** | 文章入力でオートメーション作成 — コード不要 |
-| 🔒 | **セキュリティ制御** | PCセーフモード、OTA HTTPS限定、ストリームトークン認証、チャットログマスク |
+| | **Gemini AI チャット** | コンテキストメモリ付き対話AI、あらゆる言語対応 |
+| | **カメラビジョン** | OV3660 撮影 + Gemini Vision -- 物体検出、OCR、異常レポート |
+| | **音声 I/O** | 音声認識、TTS再生、ウェイクワード検出 (ESP-SR) |
+| | **PCリモート制御** | USB Serial -- スクリーンショット、シェル、ファイル操作、アプリ起動 |
+| | **スマートスケジューリング** | 自然言語タスク作成、毎日リマインダー、繰り返しAutoTask |
+| | **16のAIスキル** | コード実行、画像生成、Excel、メール、電卓、翻訳 |
+| | **LCDディスプレイ** | ST7789 画面 -- ステータス、AI応答表示 |
+| | **OTAアップデート** | Telegram で .bin ファイルを送信してファームウェア更新 |
+| | **WiFi自動復旧** | デュアルネットワーク対応、自動再接続、120秒ヘルスチェック |
+| | **自然言語プログラミング** | 文章入力でオートメーション作成 -- コード不要 |
+| | **セキュリティ制御** | PCセーフモード、OTA HTTPS限定、ストリームトークン認証、チャットログマスク |
 
 ---
 
-## 🏗️ ユースケース
+## ユースケース
 
 | シナリオ | 方法 | 例 |
 |----------|------|-------|
-| 🏭 **工場** | スケジュール + GPIO + AIビジョン | 不良品検出、機器監視 |
-| 🏗️ **建設現場** | 定期撮影 + AI分析 | ヘルメット検出、エリアアラート |
-| 🏠 **スマートホーム** | スタンドアロン知能ユニット | 来客認識、高齢者見守り |
-| 💻 **リモートデスクトップ** | USB接続PC制御 | スクリーンショット、スクリプト、Telegram経由メール |
-| 🏢 **オフィス** | 自然言語タスク管理 | 請求書スキャン、自動スケジューリング |
+| **工場** | スケジュール + GPIO + AIビジョン | 不良品検出、機器監視 |
+| **建設現場** | 定期撮影 + AI分析 | ヘルメット検出、エリアアラート |
+| **スマートホーム** | スタンドアロン知能ユニット | 来客認識、高齢者見守り |
+| **リモートデスクトップ** | USB接続PC制御 | スクリーンショット、スクリプト、Telegram経由メール |
+| **オフィス** | 自然言語タスク管理 | 請求書スキャン、自動スケジューリング |
 
 ---
 
-<a id="-ハードウェア"></a>
+<a id="ハードウェア"></a>
 
-## 📦 ハードウェア
+## ハードウェア
 
 ### コア（必須）— 約¥1,500
 
@@ -150,26 +182,26 @@
 
 | モジュール | 価格 | 有効機能 |
 |-----------|------|---------|
-| 📷 OV3660 カメラ | ~¥450 | カメラ撮影、AIビジョン |
-| 🖥️ ST7789 LCD | ~¥300 | 絵文字、ステータス表示 |
-| 🔊 MAX98357 スピーカー | ~¥150 | TTS音声出力 |
-| 🎤 INMP441 マイク | ~¥150 | 音声入力、ウェイクワード |
+| OV3660 カメラ | ~¥450 | カメラ撮影、AIビジョン |
+| ST7789 LCD | ~¥300 | ステータス表示 |
+| MAX98357 スピーカー | ~¥150 | TTS音声出力 |
+| INMP441 マイク | ~¥150 | 音声入力、ウェイクワード |
 
 **フル構成：~¥2,250** — カメラ、画面、音声、スピーカー搭載の完全AIアシスタント。
 
 ---
 
-<a id="-クイックスタート--5分"></a>
+<a id="クイックスタート--5分"></a>
 
-## ⚡ クイックスタート — 5分
+## クイックスタート — 5分
 
 ### 前提条件
 
 | キー | 取得方法 |
 |------|---------|
-| 🤖 **Telegram Bot Token** | [@BotFather](https://t.me/BotFather) → `/newbot` |
-| 🧠 **Gemini API Key** | [Google AI Studio](https://aistudio.google.com/apikey) |
-| 📶 **WiFi SSID + パスワード** | 自宅/オフィスの WiFi |
+| **Telegram Bot Token** | [@BotFather](https://t.me/BotFather) -> `/newbot` |
+| **Gemini API Key** | [Google AI Studio](https://aistudio.google.com/apikey) |
+| **WiFi SSID + パスワード** | 自宅/オフィスの WiFi |
 
 ### ソースからビルド
 
@@ -222,7 +254,7 @@ espup install
 
 ---
 
-## 🎮 コマンドリファレンス
+## コマンドリファレンス
 
 ### コア
 
@@ -292,7 +324,7 @@ espup install
 
 ---
 
-## 🏛️ アーキテクチャ
+## アーキテクチャ
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -326,7 +358,7 @@ espup install
 ## 配線図
 
 <details>
-<summary><b>📷 OV3660 カメラ (DVP)</b></summary>
+<summary><b>OV3660 カメラ (DVP)</b></summary>
 
 | ピン | GPIO | | ピン | GPIO |
 |------|------|-|------|------|
@@ -343,7 +375,7 @@ espup install
 </details>
 
 <details>
-<summary><b>🖥️ ST7789 LCD (SPI)</b></summary>
+<summary><b>ST7789 LCD (SPI)</b></summary>
 
 RST=21, DC=47, BL=38, SCLK=19, MOSI=20, CS=45
 
@@ -352,7 +384,7 @@ RST=21, DC=47, BL=38, SCLK=19, MOSI=20, CS=45
 </details>
 
 <details>
-<summary><b>🔊 スピーカー + 🎤 マイク (I2S)</b></summary>
+<summary><b>スピーカー + マイク (I2S)</b></summary>
 
 **MAX98357:** BCLK=46, LRC=14, DIN=48
 **INMP441:** SCK=2, WS=1, SD=41
@@ -361,7 +393,7 @@ RST=21, DC=47, BL=38, SCLK=19, MOSI=20, CS=45
 
 ---
 
-## 🔑 セキュリティ
+## セキュリティ
 
 **保護済み：**
 - **バイナリにシークレットなし** — 認証情報はUSB Serial経由でNVSに書き込み、ファームウェアにはコンパイルされない
@@ -383,7 +415,7 @@ RST=21, DC=47, BL=38, SCLK=19, MOSI=20, CS=45
 
 ---
 
-## 🚀 リリースチェックリスト
+## リリースチェックリスト
 
 変更を公開する前に：
 
@@ -413,22 +445,26 @@ git push
 </details>
 
 <details><summary><b>xiaozhi-esp32 との違いは？</b></summary>
-xiaozhi-esp32 は音声チャット特化。Novaclaw は自律エッジAI特化 — カメラビジョン、スケジューリング、PC制御、自然言語プログラミング。補完的なプロジェクトです。
+xiaozhi-esp32 は音声チャット特化。Novaclaw は自律エッジAI特化 -- カメラビジョン、スケジューリング、PC制御、自然言語プログラミング。補完的なプロジェクトです。
+</details>
+
+<details><summary><b>OpenClaw や ZeroClaw との違いは？</b></summary>
+OpenClaw と ZeroClaw はデスクトップやクラウドで動作するサーバーサイド AI プラットフォームで、22+ チャンネルに対応しています。Novaclaw は約1,500円の ESP32-S3 上で直接動作するスタンドアロンファームウェアです -- サーバー不要、PC不要、Docker不要。詳しくは上記の比較表をご覧ください。
 </details>
 
 ---
 
-## 🤝 コントリビューション
+## コントリビューション
 
-PRお待ちしています！Fork → ブランチ作成 → コミット → PR。
+PRお待ちしています！Fork -> ブランチ作成 -> コミット -> PR。
 
 ---
 
-## 📄 ライセンス
+## ライセンス
 
 デュアルライセンス [MIT](LICENSE-MIT) / [Apache-2.0](LICENSE-APACHE)
 
-## 🙏 謝辞
+## 謝辞
 
 - **[Espressif](https://www.espressif.com/)** — ESP32-S3 チップと ESP-IDF フレームワーク
 - **[Google Gemini](https://ai.google.dev/)** — マルチモーダル AI API

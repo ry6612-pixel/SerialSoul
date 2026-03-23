@@ -9,7 +9,6 @@
 <h3 align="center">完整 AI 助手運行在一顆 $10 美元的微控制器上<br>不需要伺服器、不需要電腦、不需要寫程式 — 只要 WiFi</h3>
 
 <p align="center">
-  <b>🌐</b>&nbsp;
   <a href="README.md">English</a> ·
   <a href="README.zh-TW.md"><b>繁體中文</b></a> ·
   <a href="README.ja.md">日本語</a>
@@ -17,8 +16,8 @@
 
 <p align="center">
   <a href="https://github.com/ry6612-pixel/Novaclaw/stargazers"><img src="https://img.shields.io/github/stars/ry6612-pixel/Novaclaw?style=for-the-badge&color=gold" alt="Stars"></a>&nbsp;
-  <a href="#-快速開始--5-分鐘"><img src="https://img.shields.io/badge/⚡_5_分鐘上手-blue?style=for-the-badge" /></a>&nbsp;
-  <a href="#-硬體"><img src="https://img.shields.io/badge/💰_約_NT$300-green?style=for-the-badge" /></a>&nbsp;
+  <a href="#快速開始--5-分鐘"><img src="https://img.shields.io/badge/5_分鐘上手-blue?style=for-the-badge" /></a>&nbsp;
+  <a href="#硬體"><img src="https://img.shields.io/badge/約_NT$300-green?style=for-the-badge" /></a>&nbsp;
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/License-MIT%2FApache--2.0-orange?style=for-the-badge" /></a>
 </p>
 
@@ -44,7 +43,40 @@
 
 ---
 
-## 📸 實機展示
+## Novaclaw vs OpenClaw vs ZeroClaw
+
+Novaclaw 與 OpenClaw、ZeroClaw 屬於完全不同的類別。後兩者是運行在桌機或雲端的伺服器端 AI 助手平台；Novaclaw 則是直接在 $10 美元微控制器上運行的獨立韌體，完全不需要伺服器。
+
+**核心差異：Novaclaw 本身就是裝置。OpenClaw 和 ZeroClaw 把裝置當作周邊。**
+
+| | Novaclaw | ZeroClaw | OpenClaw |
+|---|---|---|---|
+| 架構 | MCU 獨立韌體 | 桌面/伺服器 CLI/Gateway | 桌面/伺服器 Node.js Gateway |
+| 語言 | Rust (esp-idf) | Rust | TypeScript |
+| 運行環境 | ESP32-S3 (NT$300 開發板) | 桌機、SBC、雲端 | 桌機、伺服器 |
+| 需要伺服器 | 不需要 | 需要自架 Gateway | 需要自架 Gateway |
+| 記憶體 | 8 MB (晶片內 PSRAM) | < 5 MB | > 1 GB |
+| 二進位大小 | ~1.8 MB 韌體 | ~8.8 MB | ~28 MB (dist) |
+| 通訊頻道 | Telegram | 22+ 頻道 | 22+ 頻道 |
+| 硬體 | 內建攝影機、LCD、喇叭、麥克風 | 周邊特性 (ESP32, RPi) | 無 |
+| 技能 | 16 個裝置內建 | 70+ 工具 + 外掛 | 5,400+ 社群 |
+| 安裝 | 燒錄一次，USB 寫入密鑰 | install.sh + onboard | Node.js + 設定 |
+
+**選擇 Novaclaw 的時機：**
+- 你想要一個不需要任何伺服器就能運作的獨立 AI 裝置
+- 你需要實體感測：攝影機視覺、環境監控、語音 I/O
+- 你想要 NT$300、待機 0.5W 的邊緣 AI
+- 你想用打字建立自動化，而不是寫程式
+
+**選擇 ZeroClaw 或 OpenClaw 的時機：**
+- 你需要 22+ 通訊頻道（WhatsApp、Slack、Discord、Signal 等）
+- 你想要有數千個社群技能的外掛生態系
+- 你需要多代理協作或瀏覽器自動化
+- 你已經有伺服器或桌機來運行 Gateway
+
+---
+
+## 實機展示
 
 > 真實截圖 — 運行在 ~NT$300 的 ESP32-S3-N16R8 開發板上。
 
@@ -104,39 +136,39 @@
 
 ---
 
-## ⭐ 主要功能
+## 主要功能
 
 | | 功能 | 說明 |
 |---|---|---|
-| 🧠 | **Gemini AI 對話** | 完整對話 AI，支援上下文記憶，任何語言 |
-| 📷 | **相機視覺** | OV3660 拍照 + Gemini Vision — 物件偵測、OCR、異常報告 |
-| 🎙️ | **語音 I/O** | 語音轉文字、TTS 語音播放、喚醒詞偵測 (ESP-SR) |
-| 🖥️ | **電腦遠端控制** | USB Serial → 截圖、Shell、檔案操作、啟動程式 |
-| 📅 | **智慧排程** | 自然語言建立任務、每日提醒、循環 AutoTask |
-| 🧰 | **16 個 AI 技能** | 程式碼執行、圖片生成、Excel、Email、計算機、翻譯 |
-| 🖼️ | **LCD 螢幕** | ST7789 螢幕 — emoji 表情、狀態顯示、AI 回覆 |
-| 🔄 | **OTA 更新** | 透過 Telegram 傳送 .bin 檔案即可升級韌體 |
-| 📡 | **WiFi 自動恢復** | 雙網路備援、自動重連、120 秒健康檢查 |
-| 💬 | **自然語言程式設計** | 用打字建立自動化 — 不需要寫程式 |
-| 🔒 | **安全控制** | PC 安全模式、OTA 僅限 HTTPS、串流 Token 驗證、聊天紀錄遮蔽 |
+| | **Gemini AI 對話** | 完整對話 AI，支援上下文記憶，任何語言 |
+| | **相機視覺** | OV3660 拍照 + Gemini Vision -- 物件偵測、OCR、異常報告 |
+| | **語音 I/O** | 語音轉文字、TTS 語音播放、喚醒詞偵測 (ESP-SR) |
+| | **電腦遠端控制** | USB Serial -- 截圖、Shell、檔案操作、啟動程式 |
+| | **智慧排程** | 自然語言建立任務、每日提醒、循環 AutoTask |
+| | **16 個 AI 技能** | 程式碼執行、圖片生成、Excel、Email、計算機、翻譯 |
+| | **LCD 螢幕** | ST7789 螢幕 -- 狀態顯示、AI 回覆 |
+| | **OTA 更新** | 透過 Telegram 傳送 .bin 檔案即可升級韌體 |
+| | **WiFi 自動恢復** | 雙網路備援、自動重連、120 秒健康檢查 |
+| | **自然語言程式設計** | 用打字建立自動化 -- 不需要寫程式 |
+| | **安全控制** | PC 安全模式、OTA 僅限 HTTPS、串流 Token 驗證、聊天紀錄遮蔽 |
 
 ---
 
-## 🏗 應用場景
+## 應用場景
 
 | 場景 | 做法 | 範例 |
 |------|------|------|
-| 🏭 **工廠** | 排程 + GPIO + AI 視覺 | 瑕疵篩選、設備監控 |
-| 🏗️ **工地** | 定時拍照 + AI 分析 | 安全帽偵測、區域警報 |
-| 🏠 **智慧家庭** | 獨立智慧單元 | 門口辨識、長者安全 |
-| 💻 **遠端桌面** | USB 連接電腦控制 | 截圖、腳本執行、Email 透過 Telegram |
-| 🏢 **辦公室** | 自然語言任務管理 | 發票掃描、自動排程 |
+| **工廠** | 排程 + GPIO + AI 視覺 | 瘡疵篩選、設備監控 |
+| **工地** | 定時拍照 + AI 分析 | 安全帽偵測、區域警報 |
+| **智慧家庭** | 獨立智慧單元 | 門口辨識、長者安全 |
+| **遠端桌面** | USB 連接電腦控制 | 截圖、腳本執行、Email 透過 Telegram |
+| **辦公室** | 自然語言任務管理 | 發票掃描、自動排程 |
 
 ---
 
-<a id="-硬體"></a>
+<a id="硬體"></a>
 
-## 📦 硬體
+## 硬體
 
 ### 核心（必備）— 約 NT$300
 
@@ -150,26 +182,26 @@
 
 | 模組 | 價格 | 啟用功能 |
 |------|------|----------|
-| 📷 OV3660 攝影機 | ~NT$100 | 相機拍照、AI 視覺 |
-| 🖥️ ST7789 LCD | ~NT$60 | Emoji 表情、狀態顯示 |
-| 🔊 MAX98357 喇叭 | ~NT$30 | TTS 語音輸出 |
-| 🎤 INMP441 麥克風 | ~NT$30 | 語音輸入、喚醒詞 |
+| OV3660 攝影機 | ~NT$100 | 相機拍照、AI 視覺 |
+| ST7789 LCD | ~NT$60 | 狀態顯示 |
+| MAX98357 嗇叭 | ~NT$30 | TTS 語音輸出 |
+| INMP441 麥克風 | ~NT$30 | 語音輸入、喚醒詞 |
 
 **完整配置：~NT$470** — 含攝影機、螢幕、語音、喇叭的完整 AI 助手。
 
 ---
 
-<a id="-快速開始--5-分鐘"></a>
+<a id="快速開始--5-分鐘"></a>
 
-## ⚡ 快速開始 — 5 分鐘
+## 快速開始 — 5 分鐘
 
 ### 事前準備
 
 | 金鑰 | 取得方式 |
 |------|----------|
-| 🤖 **Telegram Bot Token** | [@BotFather](https://t.me/BotFather) → `/newbot` |
-| 🧠 **Gemini API Key** | [Google AI Studio](https://aistudio.google.com/apikey) |
-| 📶 **WiFi SSID + 密碼** | 你家/公司的 WiFi |
+| **Telegram Bot Token** | [@BotFather](https://t.me/BotFather) -> `/newbot` |
+| **Gemini API Key** | [Google AI Studio](https://aistudio.google.com/apikey) |
+| **WiFi SSID + 密碼** | 你家/公司的 WiFi |
 
 ### 從原始碼建置
 
@@ -222,7 +254,7 @@ espup install
 
 ---
 
-## 🎮 指令參考
+## 指令參考
 
 ### 核心
 
@@ -292,7 +324,7 @@ espup install
 
 ---
 
-## 🏛️ 系統架構
+## 系統架構
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -326,7 +358,7 @@ espup install
 ## 接線圖
 
 <details>
-<summary><b>📷 OV3660 攝影機 (DVP)</b></summary>
+<summary><b>OV3660 攝影機 (DVP)</b></summary>
 
 | 接腳 | GPIO | | 接腳 | GPIO |
 |------|------|-|------|------|
@@ -343,7 +375,7 @@ espup install
 </details>
 
 <details>
-<summary><b>🖥️ ST7789 LCD (SPI)</b></summary>
+<summary><b>ST7789 LCD (SPI)</b></summary>
 
 RST=21, DC=47, BL=38, SCLK=19, MOSI=20, CS=45
 
@@ -352,7 +384,7 @@ RST=21, DC=47, BL=38, SCLK=19, MOSI=20, CS=45
 </details>
 
 <details>
-<summary><b>🔊 喇叭 + 🎤 麥克風 (I2S)</b></summary>
+<summary><b>嗇叭 + 麥克風 (I2S)</b></summary>
 
 **MAX98357:** BCLK=46, LRC=14, DIN=48
 **INMP441:** SCK=2, WS=1, SD=41
@@ -361,7 +393,7 @@ RST=21, DC=47, BL=38, SCLK=19, MOSI=20, CS=45
 
 ---
 
-## 🔑 安全性
+## 安全性
 
 **已保護：**
 - **二進位檔零密鑰** — 憑證透過 USB Serial 寫入 NVS，絕不編譯進韌體
@@ -383,7 +415,7 @@ RST=21, DC=47, BL=38, SCLK=19, MOSI=20, CS=45
 
 ---
 
-## 🚀 發布檢查清單
+## 發布檢查清單
 
 發布變更前：
 
@@ -413,22 +445,26 @@ git push
 </details>
 
 <details><summary><b>和 xiaozhi-esp32 有什麼不同？</b></summary>
-xiaozhi-esp32 專注語音聊天。Novaclaw 專注自主邊緣 AI — 攝影機視覺、排程、電腦控制、自然語言程式設計。兩者互補。
+xiaozhi-esp32 專注語音聊天。Novaclaw 專注自主邊緣 AI -- 攝影機視覺、排程、電腦控制、自然語言程式設計。兩者互補。
+</details>
+
+<details><summary><b>和 OpenClaw、ZeroClaw 有什麼不同？</b></summary>
+OpenClaw 和 ZeroClaw 是運行在桌機或雲端的伺服器端 AI 平台，支援 22+ 通訊頻道。Novaclaw 是直接在 NT$300 ESP32-S3 上運行的獨立韌體 -- 不需要伺服器、不需要電腦、不需要 Docker。詳見上方比較表。
 </details>
 
 ---
 
-## 🤝 貢獻
+## 貢獻
 
-歡迎 PR！Fork → 開分支 → Commit → PR。
+歡迎 PR！Fork -> 開分支 -> Commit -> PR。
 
 ---
 
-## 📄 授權
+## 授權
 
 雙授權 [MIT](LICENSE-MIT) / [Apache-2.0](LICENSE-APACHE)。
 
-## 🙏 致謝
+## 致謝
 
 - **[Espressif](https://www.espressif.com/)** — ESP32-S3 晶片及 ESP-IDF 框架
 - **[Google Gemini](https://ai.google.dev/)** — 多模態 AI API
