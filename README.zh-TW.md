@@ -1,9 +1,4 @@
 <h1 align="center">
-  <br>
-  <img src="docs/demo/01-boot-status.png" alt="Novaclaw 開機" width="280">
-  <br>
-  Novaclaw
-  <br>
 </h1>
 
 <h3 align="center">完整 AI 助手運行在一顆 $10 美元的微控制器上<br>不需要伺服器、不需要電腦、不需要寫程式 — 只要 WiFi</h3>
