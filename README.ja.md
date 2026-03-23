@@ -1,9 +1,4 @@
 <h1 align="center">
-  <br>
-  <img src="docs/demo/01-boot-status.png" alt="Novaclaw 起動" width="280">
-  <br>
-  Novaclaw
-  <br>
 </h1>
 
 <h3 align="center">10ドルのマイコンで動く完全なAIアシスタント<br>サーバー不要・PC不要・コーディング不要 — WiFiだけ</h3>
