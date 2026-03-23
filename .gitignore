@@ -2,6 +2,9 @@
 target/
 .embuild/
 
+# Local dev workspace (logs, scripts, test outputs)
+.local-dev/
+
 # IDE
 .vscode/
 *.code-workspace
@@ -31,6 +34,7 @@ sr_bindings.h
 *.ps1
 !build.ps1
 !flash.ps1
+!provision.ps1
 !setup-secure-config.ps1
 !pre-publish-scan.ps1
 
@@ -43,6 +47,10 @@ __pycache__/
 src/main_*.rs
 src/*.rs.v*
 *.corrupted
+
+# Binary outputs
+*.bin
+*.elf
 
 # OTA artifacts
 ota_serve/

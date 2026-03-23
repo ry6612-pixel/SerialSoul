@@ -2010,42 +2010,165 @@ fn save_last_telegram_update_id(nvs: &mut EspNvs<NvsDefault>, update_id: i64) {
 }
 
 fn load_tts_proxy_url(nvs: &EspNvs<NvsDefault>) -> Option<String> {
-    nvs_get(nvs, TTS_PROXY_URL_KEY).or_else(|| option_env!("TTS_PROXY_URL").map(|v| v.to_string()))
+    nvs_get(nvs, TTS_PROXY_URL_KEY)
 }
 
 fn load_tts_proxy_voice(nvs: &EspNvs<NvsDefault>) -> String {
     nvs_get(nvs, TTS_PROXY_VOICE_KEY)
-        .or_else(|| option_env!("TTS_PROXY_VOICE").map(|v| v.to_string()))
         .unwrap_or_else(|| "zh-TW-HsiaoChenNeural".to_string())
 }
 
+/// Read one line from UART0 using low-level esp-idf uart_read_bytes.
+/// Returns the line (without newline) or empty string on timeout.
+fn uart0_read_line(timeout_ms: u32) -> String {
+    let mut buf = Vec::with_capacity(512);
+    let byte_timeout = if timeout_ms > 200 { 200 } else { timeout_ms };
+    let deadline = std::time::Instant::now() + Duration::from_millis(timeout_ms as u64);
+    loop {
+        if std::time::Instant::now() > deadline {
+            break;
+        }
+        let mut byte = [0u8; 1];
+        let n = unsafe {
+            esp_idf_svc::sys::uart_read_bytes(
+                0, // UART0
+                byte.as_mut_ptr() as *mut _,
+                1,
+                byte_timeout / 10, // ticks (portTICK_PERIOD_MS = 10ms on default)
+            )
+        };
+        if n > 0 {
+            if byte[0] == b'\n' || byte[0] == b'\r' {
+                if !buf.is_empty() {
+                    break;
+                }
+                // skip leading CR/LF
+                continue;
+            }
+            buf.push(byte[0]);
+            if buf.len() >= 4096 {
+                break; // safety limit
+            }
+        }
+    }
+    String::from_utf8_lossy(&buf).to_string()
+}
+
+/// Wait for JSON provisioning via USB Serial when NVS is empty (first boot).
+/// Expected format: {"WIFI_SSID":"...","TG_TOKEN":"...","GEMINI_KEY":"...","CHAT_ID":"...",...}
+fn serial_provision(nvs: &mut EspNvs<NvsDefault>) -> Result<()> {
+    warn!("NVS config incomplete — entering Serial provisioning mode");
+    warn!("Send JSON config via USB Serial (or run provision.ps1)");
+
+    // Install UART0 driver so uart_read_bytes works
+    let uart_installed = unsafe {
+        esp_idf_svc::sys::uart_driver_install(
+            0,    // UART0
+            1024, // RX buffer
+            0,    // TX buffer (not needed — println! uses VFS)
+            0,    // queue size
+            std::ptr::null_mut(), // queue handle
+            0,    // intr alloc flags
+        )
+    };
+    if uart_installed != 0 {
+        warn!("uart_driver_install returned {} (may already be installed)", uart_installed);
+    }
+
+    // Print a machine-readable marker so provision.ps1 can detect readiness
+    println!("{{\"provision\":\"ready\"}}");
+
+    let deadline = std::time::Instant::now() + Duration::from_secs(300); // 5 min timeout
+
+    loop {
+        if std::time::Instant::now() > deadline {
+            bail!("Provisioning timeout — no config received in 5 minutes");
+        }
+        let line = uart0_read_line(2000);
+        let trimmed = line.trim();
+        if trimmed.is_empty() || !trimmed.starts_with('{') {
+            continue;
+        }
+        let obj: serde_json::Value = match serde_json::from_str(trimmed) {
+            Ok(v) => v,
+            Err(e) => {
+                warn!("Invalid JSON: {}", e);
+                println!("{{\"provision\":\"error\",\"msg\":\"invalid JSON\"}}");
+                continue;
+            }
+        };
+        // Store all recognised keys into NVS
+        let keys = [
+            ("WIFI_SSID", "wifi_ssid"),
+            ("WIFI_PASS", "wifi_pass"),
+            ("WIFI_SSID2", "wifi_ssid2"),
+            ("WIFI_PASS2", "wifi_pass2"),
+            ("TG_TOKEN", "tg_token"),
+            ("GEMINI_KEY", "gemini_key"),
+            ("CHAT_ID", "chat_id"),
+            ("TTS_PROXY_URL", TTS_PROXY_URL_KEY),
+            ("TTS_PROXY_VOICE", TTS_PROXY_VOICE_KEY),
+        ];
+        let mut stored = 0u32;
+        for (json_key, nvs_key) in keys {
+            if let Some(val) = obj.get(json_key).and_then(|v| v.as_str()) {
+                if !val.is_empty() {
+                    let _ = nvs.set_str(nvs_key, val);
+                    stored += 1;
+                }
+            }
+        }
+        // Validate required keys are now present
+        let has_wifi = nvs_get(nvs, "wifi_ssid").is_some();
+        let has_tg   = nvs_get(nvs, "tg_token").is_some();
+        let has_gem  = nvs_get(nvs, "gemini_key").is_some();
+        let has_chat = nvs_get(nvs, "chat_id").is_some();
+        if has_wifi && has_tg && has_gem && has_chat {
+            info!("Provisioning complete — {} keys stored", stored);
+            println!("{{\"provision\":\"ok\",\"stored\":{}}}", stored);
+            return Ok(());
+        }
+        let missing: Vec<&str> = [
+            (!has_wifi, "WIFI_SSID"),
+            (!has_tg,   "TG_TOKEN"),
+            (!has_gem,  "GEMINI_KEY"),
+            (!has_chat, "CHAT_ID"),
+        ].iter().filter(|(m, _)| *m).map(|(_, n)| *n).collect();
+        warn!("Provisioning incomplete, still missing: {:?}", missing);
+        println!("{{\"provision\":\"incomplete\",\"missing\":{:?}}}", missing);
+    }
+}
+
 fn load_config(nvs: &mut EspNvs<NvsDefault>) -> Result<Config> {
+    // Check if core secrets exist in NVS; if not, enter serial provisioning
+    let needs_provision = nvs_get(nvs, "wifi_ssid").is_none()
+        || nvs_get(nvs, "tg_token").is_none()
+        || nvs_get(nvs, "gemini_key").is_none()
+        || nvs_get(nvs, "chat_id").is_none();
+
+    if needs_provision {
+        serial_provision(nvs)?;
+    }
+
     let wifi_ssid = nvs_get(nvs, "wifi_ssid")
-        .or_else(|| option_env!("WIFI_SSID").map(|v| { let _ = nvs.set_str("wifi_ssid", v); v.to_string() }))
         .ok_or_else(|| anyhow::anyhow!("WIFI_SSID not set"))?;
 
     let wifi_pass = nvs_get(nvs, "wifi_pass")
-        .or_else(|| option_env!("WIFI_PASS").map(|v| { let _ = nvs.set_str("wifi_pass", v); v.to_string() }))
         .unwrap_or_default();
 
     let wifi_ssid2 = nvs_get(nvs, "wifi_ssid2")
-        .or_else(|| option_env!("WIFI_SSID2").map(|v| { let _ = nvs.set_str("wifi_ssid2", v); v.to_string() }))
         .unwrap_or_default();
 
     let wifi_pass2 = nvs_get(nvs, "wifi_pass2")
-        .or_else(|| option_env!("WIFI_PASS2").map(|v| { let _ = nvs.set_str("wifi_pass2", v); v.to_string() }))
         .unwrap_or_default();
 
     let tg_token = nvs_get(nvs, "tg_token")
-        .or_else(|| option_env!("TG_TOKEN").map(|v| { let _ = nvs.set_str("tg_token", v); v.to_string() }))
         .ok_or_else(|| anyhow::anyhow!("TG_TOKEN not set"))?;
 
     let gemini_key = nvs_get(nvs, "gemini_key")
-        .or_else(|| option_env!("GEMINI_KEY").map(|v| { let _ = nvs.set_str("gemini_key", v); v.to_string() }))
         .ok_or_else(|| anyhow::anyhow!("GEMINI_KEY not set"))?;
 
     let chat_id = nvs_get(nvs, "chat_id")
-        .or_else(|| option_env!("CHAT_ID").map(|v| { let _ = nvs.set_str("chat_id", v); v.to_string() }))
         .ok_or_else(|| anyhow::anyhow!("CHAT_ID not set"))?;
 
     Ok(Config { wifi_ssid, wifi_pass, wifi_ssid2, wifi_pass2, tg_token, gemini_key, chat_id })

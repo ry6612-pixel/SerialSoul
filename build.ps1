@@ -62,12 +62,20 @@ foreach ($key in $required) {
 . "$HOME\export-esp.ps1"
 "$(Get-Date) ESP env loaded" | Add-Content $log
 
-# Set environment variables from config
+# Security: Do NOT export secrets as env vars — they must NOT be baked into
+# the binary via option_env!().  Secrets are provisioned into NVS at first
+# boot via provision.ps1 (USB Serial).
+# Only non-secret build hints go into the environment.
+$secretKeys = @("TG_TOKEN", "GEMINI_KEY", "CHAT_ID",
+                "WIFI_SSID", "WIFI_PASS", "WIFI_SSID2", "WIFI_PASS2",
+                "TTS_PROXY_URL", "TTS_PROXY_VOICE")
 foreach ($kv in $configVars.GetEnumerator()) {
-    if ($kv.Value) {
+    if ($kv.Value -and $secretKeys -notcontains $kv.Key) {
         Set-Item "env:$($kv.Key)" $kv.Value
     }
 }
+
+Write-Host "Secrets are NOT baked into binary. Use provision.ps1 after flashing." -ForegroundColor Green
 
 Set-Location $PSScriptRoot
 "$(Get-Date) Building..." | Add-Content $log
