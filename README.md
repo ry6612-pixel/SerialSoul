@@ -1,9 +1,4 @@
 <h1 align="center">
-  <br>
-  <img src="docs/demo/01-boot-status.png" alt="Novaclaw Boot" width="280">
-  <br>
-  Novaclaw
-  <br>
 </h1>
 
 <h3 align="center">A complete AI assistant running on a $10 microcontroller.<br>No server. No PC. No code. Just WiFi.</h3>
