@@ -259,7 +259,8 @@ espup install
 2. `NOVACLAW_CONFIG` environment variable
 3. `NOVACLAW_CONFIG_DIR/user_config.txt`
 4. `$HOME/.novaclaw/secrets/user_config.txt`
-5. Repo-local `user_config.txt` (legacy fallback)
+
+> Repo-local `user_config.txt` is **blocked** — build and provision scripts will abort if one is found in the repo root.
 
 </details>
 

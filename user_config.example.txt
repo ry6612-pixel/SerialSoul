@@ -13,9 +13,10 @@
 #
 # ============================================
 # Security note:
-# - Do NOT keep real secrets in the repo folder unless you must.
-# - build.ps1 will prefer NOVACLAW_CONFIG or %USERPROFILE%\.novaclaw\secrets\user_config.txt
-# - repo-local user_config.txt is still supported only for backward compatibility.
+# - Do NOT keep real secrets in the repo folder.
+# - build.ps1 and provision.ps1 will REFUSE to run if user_config.txt exists in the repo root.
+# - Secrets must be stored externally: %USERPROFILE%\.novaclaw\secrets\user_config.txt
+# - You can also set NOVACLAW_CONFIG environment variable to a custom path.
 
 # ===== WiFi (Required — at least WiFi 1) =====
 # Primary WiFi network

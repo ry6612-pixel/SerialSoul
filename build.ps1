@@ -2,7 +2,19 @@ $ErrorActionPreference = "Continue"
 $log = "build_log.txt"
 "$(Get-Date) === BUILD START ===" | Set-Content $log
 
-# ─── Resolve config path (prefer repo-external secret store) ───
+# ─── Secret-file guard: abort if dangerous files exist in repo root ───
+$dangerousFiles = @("user_config.txt", ".env")
+foreach ($df in $dangerousFiles) {
+    $dfPath = Join-Path $PSScriptRoot $df
+    if (Test-Path $dfPath) {
+        Write-Host "FATAL: '$df' found in repo root! Remove it immediately." -ForegroundColor Red
+        Write-Host "Secrets must live OUTSIDE the repo: $HOME\.novaclaw\secrets\user_config.txt" -ForegroundColor Red
+        Write-Host "Run: .\setup-secure-config.ps1" -ForegroundColor Yellow
+        exit 1
+    }
+}
+
+# ─── Resolve config path (repo-external ONLY — no repo-local fallback) ───
 function Resolve-ConfigFile {
     $candidates = @()
 
@@ -14,7 +26,7 @@ function Resolve-ConfigFile {
     }
 
     $candidates += (Join-Path $HOME ".novaclaw\secrets\user_config.txt")
-    $candidates += (Join-Path $PSScriptRoot "user_config.txt")
+    # NO repo-local fallback — secrets must be external
 
     foreach ($candidate in $candidates) {
         if ($candidate -and (Test-Path $candidate)) {
@@ -28,16 +40,13 @@ function Resolve-ConfigFile {
 $configFile = Resolve-ConfigFile
 if (-Not $configFile) {
     Write-Host "ERROR: user_config.txt not found!" -ForegroundColor Red
-    Write-Host "Recommended secure path: $HOME\.novaclaw\secrets\user_config.txt"
-    Write-Host "You can also set NOVACLAW_CONFIG to a custom file path."
+    Write-Host "Required path: $HOME\.novaclaw\secrets\user_config.txt" -ForegroundColor Red
+    Write-Host "You can also set NOVACLAW_CONFIG to a custom external path."
     Write-Host "Run .\setup-secure-config.ps1 to create the secure secret store."
     exit 1
 }
 
 Write-Host "Using config: $configFile" -ForegroundColor Cyan
-if ($configFile -like "$PSScriptRoot*") {
-    Write-Host "WARNING: Using repo-local config. Move secrets to $HOME\.novaclaw\secrets for safer separation." -ForegroundColor Yellow
-}
 
 $configVars = @{}
 Get-Content $configFile -Encoding UTF8 | ForEach-Object {

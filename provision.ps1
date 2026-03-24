@@ -17,7 +17,18 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# ── Resolve config file (same logic as build.ps1) ──
+# ── Secret-file guard: abort if dangerous files exist in repo root ──
+$dangerousFiles = @("user_config.txt", ".env")
+foreach ($df in $dangerousFiles) {
+    $dfPath = Join-Path $PSScriptRoot $df
+    if (Test-Path $dfPath) {
+        Write-Host "FATAL: '$df' found in repo root! Remove it immediately." -ForegroundColor Red
+        Write-Host "Secrets must live OUTSIDE the repo: $HOME\.novaclaw\secrets\user_config.txt" -ForegroundColor Red
+        exit 1
+    }
+}
+
+# ── Resolve config file (repo-external ONLY — no repo-local fallback) ──
 function Resolve-ConfigFile {
     $candidates = @()
     if ($Config) { $candidates += $Config }
@@ -26,7 +37,7 @@ function Resolve-ConfigFile {
         $candidates += (Join-Path $env:NOVACLAW_CONFIG_DIR "user_config.txt")
     }
     $candidates += (Join-Path $HOME ".novaclaw\secrets\user_config.txt")
-    $candidates += (Join-Path $PSScriptRoot "user_config.txt")
+    # NO repo-local fallback — secrets must be external
 
     foreach ($c in $candidates) {
         if ($c -and (Test-Path $c)) { return $c }
@@ -37,6 +48,7 @@ function Resolve-ConfigFile {
 $configFile = Resolve-ConfigFile
 if (-not $configFile) {
     Write-Host "ERROR: user_config.txt not found." -ForegroundColor Red
+    Write-Host "Required path: $HOME\.novaclaw\secrets\user_config.txt" -ForegroundColor Red
     Write-Host "Run .\setup-secure-config.ps1 to create it."
     exit 1
 }

@@ -259,7 +259,8 @@ espup install
 2. `NOVACLAW_CONFIG` 環境變數
 3. `NOVACLAW_CONFIG_DIR/user_config.txt`
 4. `$HOME/.novaclaw/secrets/user_config.txt`
-5. Repo 本地 `user_config.txt`（舊版備援）
+
+> Repo 根目錄的 `user_config.txt` 已被**禁止** — build 和 provision 腳本發現後會直接中止。
 
 </details>
 

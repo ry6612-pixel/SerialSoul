@@ -259,7 +259,8 @@ espup install
 2. `NOVACLAW_CONFIG` 環境変数
 3. `NOVACLAW_CONFIG_DIR/user_config.txt`
 4. `$HOME/.novaclaw/secrets/user_config.txt`
-5. リポジトリローカル `user_config.txt`（レガシーフォールバック）
+
+> リポジトリルートの `user_config.txt` は**禁止** — build・provision スクリプトは検出時に即座に中断します。
 
 </details>
 
