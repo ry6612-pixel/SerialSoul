@@ -2237,7 +2237,12 @@ fn main() -> Result<()> {
         let _ = wifi.disconnect();
     }
     if !wifi_ok {
-        bail!("WiFi：所有網路都連接失敗，停止中");
+        warn!("WiFi：所有網路都連接失敗，進入 Serial 救援模式...");
+        warn!("請執行 provision.ps1 或透過 Serial 傳送 WiFi 設定");
+        serial_provision(&mut nvs)?;
+        // Restart to apply new credentials
+        warn!("WiFi credentials updated — restarting...");
+        unsafe { esp_idf_svc::sys::esp_restart(); }
     }
 
     // NTP time sync
@@ -3813,7 +3818,7 @@ fn handle_wifi_command(cfg: &Config, nvs: &mut EspNvs<NvsDefault>, chat_id: i64,
         let _ = nvs.set_str("wifi_ssid2", &s1);
         let _ = nvs.set_str("wifi_pass2", &p1);
         let _ = send_telegram(&cfg.tg_token, chat_id,
-            &format!("\u{2705} \u{4e92}\u{63db}\u{5b8c}\u{6210}\uff01\n1: {} \u{2192} {}\n\u{7cfb}\u{7d71}\u{91cd}\u{555f}\u{4e2d}...", s1, s2));
+            &format!("\u{2705} \u{4e92}\u{63db}\u{5b8c}\u{6210}\u{ff01}\n1: {} \u{2192} {}\n\u{7cfb}\u{7d71}\u{91cd}\u{555f}\u{4e2d}...", s1, s2));
         unsafe { esp_idf_svc::sys::esp_restart(); }
     }
 

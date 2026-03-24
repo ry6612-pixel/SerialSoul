@@ -475,8 +475,11 @@ PRお待ちしています！Fork -> ブランチ作成 -> コミット -> PR。
 
 デュアルライセンス [MIT](LICENSE-MIT) / [Apache-2.0](LICENSE-APACHE)
 
+> **帰属表示：** Novaclaw を使用、フォーク、または再配布する場合は、プロジェクト名 **NOVA-CLAW** をクレジットし、このリポジトリへのリンクを記載してください。両ライセンスとも著作権表示とライセンス表示の保持を要求しています。
+
 ## 謝辞
 
 - **[Espressif](https://www.espressif.com/)** — ESP32-S3 チップと ESP-IDF フレームワーク
 - **[Google Gemini](https://ai.google.dev/)** — マルチモーダル AI API
-- **[xiaozhi-esp32](https://github.com/78/xiaozhi-esp32)** — 先駆的な ESP32 AI プロジェクト
+- **[xiaozhi-esp32（小智）](https://github.com/78/xiaozhi-esp32)** — 先駆的な ESP32 AI 音声アシスタントプロジェクト
+- **ZeroClaw** — ESP32/Rust AI エージェントプラットフォーム；比較とインスピレーション

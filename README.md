@@ -475,8 +475,11 @@ PRs welcome! Fork -> branch -> commit -> PR.
 
 Dual-licensed under [MIT](LICENSE-MIT) / [Apache-2.0](LICENSE-APACHE).
 
+> **Attribution Notice:** If you use, fork, or redistribute Novaclaw (in whole or in part), please credit the project name **NOVA-CLAW** and link to this repository. Both licenses require preservation of copyright and license notices.
+
 ## Acknowledgments
 
 - **[Espressif](https://www.espressif.com/)** — ESP32-S3 chip and ESP-IDF framework
 - **[Google Gemini](https://ai.google.dev/)** — Multimodal AI API
-- **[xiaozhi-esp32](https://github.com/78/xiaozhi-esp32)** — Pioneering ESP32 AI project
+- **[xiaozhi-esp32 (小智)](https://github.com/78/xiaozhi-esp32)** — Pioneering ESP32 AI voice assistant project
+- **ZeroClaw** — ESP32/Rust AI agent platform; comparison and inspiration
