@@ -17,6 +17,20 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# ── Auto-install git hooks from .githooks/ ──
+$hooksSource = Join-Path $PSScriptRoot ".githooks"
+$hooksDest   = Join-Path $PSScriptRoot ".git\hooks"
+if (Test-Path $hooksSource) {
+    foreach ($hookFile in Get-ChildItem $hooksSource -File) {
+        $dest = Join-Path $hooksDest $hookFile.Name
+        $needCopy = (-not (Test-Path $dest)) -or ($hookFile.LastWriteTimeUtc -gt (Get-Item $dest).LastWriteTimeUtc)
+        if ($needCopy) {
+            Copy-Item $hookFile.FullName $dest -Force
+            Write-Host "Hook installed: $($hookFile.Name)" -ForegroundColor Green
+        }
+    }
+}
+
 # ── Secret-file guard: abort if dangerous files exist in repo root ──
 $dangerousFiles = @("user_config.txt", ".env")
 foreach ($df in $dangerousFiles) {

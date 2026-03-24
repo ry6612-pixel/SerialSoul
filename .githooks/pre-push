@@ -1,0 +1,75 @@
+#!/bin/sh
+# NOVA-CLAW Pre-Push Secret Guard
+# Runs automatically before every git push. Blocks if:
+#   1. Banned files are tracked
+#   2. Secret patterns found in diff against remote
+#   3. Secret patterns found in tracked file contents
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+echo "=== NOVA-CLAW pre-push secret scan ==="
+FAIL=0
+
+# ── Check 1: Banned files in tracking ──
+BANNED_FILES=$(git ls-files -- \
+  user_config.txt .env .env.local .env.production .env.staging .env.dev \
+  '*.log' '*.bak' '*.corrupted' '*.orig' \
+  '*.pem' '*.key' '*.p12' '*.pfx' '*.jks' '*.keystore' \
+  'secrets.txt' 'wifi.txt' \
+  2>/dev/null)
+if [ -n "$BANNED_FILES" ]; then
+  echo "${RED}BLOCKED: Banned files are tracked:${NC}"
+  echo "$BANNED_FILES"
+  FAIL=1
+fi
+
+# ── Check 2: Secret patterns in diff against remote ──
+TG_PAT='[0-9]{8,10}:AA[A-Za-z0-9_-]{20,}'
+GOOG_PAT='AIzaSy[A-Z][a-z0-9A-Z_-]{25,}'
+GH_PAT='(ghp_|gho_|ghs_)[A-Za-z0-9]{36,}'
+AWS_PAT='AKIA[0-9A-Z]{16}'
+KEY_PAT='BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY'
+COMBINED="$TG_PAT|$GOOG_PAT|$GH_PAT|$AWS_PAT|$KEY_PAT"
+
+DIFF_HITS=$(git diff origin/main 2>/dev/null | grep '^\+' | grep -c -E -e "$COMBINED" || true)
+if [ "$DIFF_HITS" -gt 0 ]; then
+  echo "${RED}BLOCKED: $DIFF_HITS potential secret(s) in push diff!${NC}"
+  FAIL=1
+fi
+
+# ── Check 3: Scan all tracked files for secrets ──
+FALSE_POS='YourBotToken|YourGemini|placeholder|example|XXXXXXX|AIzaSyXXX|AIzaSyYour|notmatch|pattern|regex|scan|detect'
+TRACKED=$(git ls-files -- '*.rs' '*.ps1' '*.txt' '*.md' '*.toml' '*.json' '*.yaml' '*.yml' '*.sh' '*.cfg' '*.ini' 2>/dev/null)
+FILE_HITS=0
+for FILE in $TRACKED; do
+  if [ -f "$FILE" ]; then
+    MATCHES=$(grep -c -E -e "$COMBINED" "$FILE" 2>/dev/null || true)
+    if [ "$MATCHES" -gt 0 ]; then
+      REAL=$(grep -E -e "$COMBINED" "$FILE" 2>/dev/null | grep -c -v -E -e "$FALSE_POS" || true)
+      if [ "$REAL" -gt 0 ]; then
+        echo "  ${YELLOW}WARNING${NC}: $FILE has $REAL suspicious match(es)"
+        FILE_HITS=$((FILE_HITS + REAL))
+      fi
+    fi
+  fi
+done
+
+if [ "$FILE_HITS" -gt 0 ]; then
+  echo "${RED}BLOCKED: $FILE_HITS potential secret(s) in tracked files!${NC}"
+  echo "Run: powershell -File pre-publish-scan.ps1 for details"
+  FAIL=1
+fi
+
+# ── Result ──
+if [ "$FAIL" -ne 0 ]; then
+  echo ""
+  echo "${RED}Push blocked. Fix the issues above.${NC}"
+  echo "Override (DANGEROUS): git push --no-verify"
+  exit 1
+fi
+
+echo "${GREEN}OK: No secrets detected${NC}"
+exit 0

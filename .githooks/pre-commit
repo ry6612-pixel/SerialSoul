@@ -1,0 +1,119 @@
+#!/bin/sh
+# NOVA-CLAW Pre-Commit Secret Guard
+# Blocks commits that contain credentials or banned files.
+#
+# Layer 1: Banned filenames — broad patterns covering renamed secrets
+# Layer 2: Content patterns — Telegram token, Gemini key, GitHub token,
+#          AWS key, private keys, WiFi passwords
+
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+ISSUES=""
+
+# ── Layer 1: Banned filenames ──
+STAGED=$(git diff --cached --name-only --diff-filter=ACM)
+if [ -z "$STAGED" ]; then
+  exit 0
+fi
+
+for FILE in $STAGED; do
+  BASENAME=$(basename "$FILE")
+  LOWER=$(echo "$BASENAME" | tr '[:upper:]' '[:lower:]')
+
+  # Exact banned names
+  case "$LOWER" in
+    user_config.txt|.env|.env.local|.env.production|.env.staging|.env.dev)
+      ISSUES="$ISSUES\n  BANNED FILE: $FILE"
+      ;;
+  esac
+
+  # Pattern-based bans: anything that smells like a secret/config/backup
+  case "$LOWER" in
+    *.log|*.bak|*.corrupted|*.orig)
+      ISSUES="$ISSUES\n  BANNED FILE: $FILE (temp/backup extension)"
+      ;;
+    secrets.txt|secrets.*.txt|*secret*.*|*credential*.*|*password*.*)
+      ISSUES="$ISSUES\n  BANNED FILE: $FILE (secret-like name)"
+      ;;
+    wifi.txt|wifi_*.txt|prod.env*|staging.env*|dev.env*)
+      ISSUES="$ISSUES\n  BANNED FILE: $FILE (config-like name)"
+      ;;
+    *.pem|*.key|*.p12|*.pfx|*.jks|*.keystore)
+      ISSUES="$ISSUES\n  BANNED FILE: $FILE (key/certificate file)"
+      ;;
+  esac
+
+  # Path-based bans
+  case "$FILE" in
+    *secrets/*|*.novaclaw/*|*ESP_config_backup/*)
+      ISSUES="$ISSUES\n  BANNED PATH: $FILE"
+      ;;
+  esac
+done
+
+# ── Layer 2: Content pattern scanning ──
+for FILE in $STAGED; do
+  CONTENT=$(git show ":$FILE" 2>/dev/null)
+  if [ -z "$CONTENT" ]; then
+    continue
+  fi
+
+  # Skip binary by checking for null bytes
+  if echo "$CONTENT" | head -c 512 | grep -qP '[\x00-\x08]' 2>/dev/null; then
+    continue
+  fi
+
+  # Telegram Bot Token: 8-10 digits : AA + 30 chars
+  if echo "$CONTENT" | grep -q -E -e '[0-9]{8,10}:AA[A-Za-z0-9_-]{30,}'; then
+    FP=$(echo "$CONTENT" | grep -E -e '[0-9]{8,10}:AA[A-Za-z0-9_-]{30,}' | grep -c -i -E -e 'example|placeholder|YourBotToken|123456:ABC' || true)
+    if [ "$FP" -eq 0 ]; then
+      ISSUES="$ISSUES\n  $FILE: Telegram Bot Token pattern"
+    fi
+  fi
+
+  # Google/Gemini API Key: AIzaSy + 33 real chars
+  if echo "$CONTENT" | grep -q -E -e 'AIzaSy[A-Za-z0-9_-]{33}'; then
+    FP=$(echo "$CONTENT" | grep -E -e 'AIzaSy[A-Za-z0-9_-]{33}' | grep -c -E -e 'AIzaSy(XXXX|YourG)' || true)
+    if [ "$FP" -eq 0 ]; then
+      ISSUES="$ISSUES\n  $FILE: Google/Gemini API key pattern"
+    fi
+  fi
+
+  # GitHub tokens
+  if echo "$CONTENT" | grep -q -E -e '(ghp_|gho_|ghs_|ghr_)[A-Za-z0-9_]{36,}'; then
+    ISSUES="$ISSUES\n  $FILE: GitHub token pattern"
+  fi
+
+  # AWS keys
+  if echo "$CONTENT" | grep -q -E -e 'AKIA[0-9A-Z]{16}'; then
+    ISSUES="$ISSUES\n  $FILE: AWS access key pattern"
+  fi
+
+  # Private keys
+  if echo "$CONTENT" | grep -q -E -e 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY'; then
+    ISSUES="$ISSUES\n  $FILE: Private key"
+  fi
+
+  # WiFi password values (not in example file)
+  if [ "$(basename "$FILE")" != "user_config.example.txt" ]; then
+    if echo "$CONTENT" | grep -q -i -E -e 'WIFI_PASS[0-9]*\s*=\s*"[^"]{4,}"'; then
+      ISSUES="$ISSUES\n  $FILE: WiFi password value"
+    fi
+  fi
+done
+
+if [ -n "$ISSUES" ]; then
+  echo ""
+  echo "${RED}========================================${NC}"
+  echo "${RED}  COMMIT BLOCKED — secrets detected!${NC}"
+  echo "${RED}========================================${NC}"
+  echo "$ISSUES"
+  echo ""
+  echo "Fix: Remove the file or secret, then re-stage."
+  echo "Override (DANGEROUS): git commit --no-verify"
+  exit 1
+fi
+
+exit 0

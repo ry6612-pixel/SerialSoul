@@ -65,7 +65,13 @@ if ($trackedHits.Count -gt 0) {
 # ─── 2. Banned file check ───
 Write-Host "[2/7] Checking for banned files in tracking..." -ForegroundColor Yellow
 
-$bannedPatterns = @("user_config.txt", "*.env", ".env.*", "*.log", "*.bak", "*.corrupted")
+$bannedPatterns = @(
+    "user_config.txt", "*.env", ".env.*",
+    "*.log", "*.bak", "*.corrupted", "*.orig",
+    "*.pem", "*.key", "*.p12", "*.pfx", "*.jks", "*.keystore",
+    "secrets.txt", "wifi.txt", "wifi_*.txt",
+    "*secret*.*", "*credential*.*", "*password*.*"
+)
 $bannedHits = @()
 foreach ($b in $bannedPatterns) {
     $foundFiles = $trackedFiles | Where-Object { $_ -like $b }
