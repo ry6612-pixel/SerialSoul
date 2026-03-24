@@ -67,7 +67,11 @@ foreach ($key in $required) {
 # boot via provision.ps1 (USB Serial).
 # Only non-secret build hints go into the environment.
 $secretKeys = @("TG_TOKEN", "GEMINI_KEY", "CHAT_ID",
-                "WIFI_SSID", "WIFI_PASS", "WIFI_SSID2", "WIFI_PASS2",
+                "WIFI_SSID", "WIFI_PASS",
+                "WIFI_SSID2", "WIFI_PASS2",
+                "WIFI_SSID3", "WIFI_PASS3",
+                "WIFI_SSID4", "WIFI_PASS4",
+                "WIFI_SSID5", "WIFI_PASS5",
                 "TTS_PROXY_URL", "TTS_PROXY_VOICE")
 foreach ($kv in $configVars.GetEnumerator()) {
     if ($kv.Value -and $secretKeys -notcontains $kv.Key) {

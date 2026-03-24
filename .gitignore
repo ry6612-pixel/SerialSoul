@@ -17,6 +17,7 @@ components_esp32s3.lock
 
 # === SECRETS — NEVER COMMIT ===
 user_config.txt
+ESP_config_backup/
 *.env
 
 # Temp/debug files

@@ -989,7 +989,7 @@ fn builtin_skills() -> Vec<Skill> {
         },
         Skill {
             name: "board_wifi_help".to_string(),
-            description: "Explain runtime Wi-Fi commands clearly: /wifi, /wifi set SSID|PASSWORD, /wifi clear".to_string(),
+            description: "Explain runtime Wi-Fi commands: /wifi status, /wifi set<N> SSID PASSWORD (N=1-5), /wifi del <N>, /wifi swap, /wifi clear".to_string(),
             trigger: "wifi".to_string(),
         },
         Skill {
@@ -1434,10 +1434,7 @@ fn parse_pc_tags(reply: &str, chat_id: i64) -> (String, bool) {
 // ===== Config =====
 
 struct Config {
-    wifi_ssid: String,
-    wifi_pass: String,
-    wifi_ssid2: String,
-    wifi_pass2: String,
+    wifi: Vec<(String, String)>,  // up to 5 (ssid, pass) pairs
     tg_token: String,
     gemini_key: String,
     chat_id: String,
@@ -2103,6 +2100,12 @@ fn serial_provision(nvs: &mut EspNvs<NvsDefault>) -> Result<()> {
             ("WIFI_PASS", "wifi_pass"),
             ("WIFI_SSID2", "wifi_ssid2"),
             ("WIFI_PASS2", "wifi_pass2"),
+            ("WIFI_SSID3", "wifi_ssid3"),
+            ("WIFI_PASS3", "wifi_pass3"),
+            ("WIFI_SSID4", "wifi_ssid4"),
+            ("WIFI_PASS4", "wifi_pass4"),
+            ("WIFI_SSID5", "wifi_ssid5"),
+            ("WIFI_PASS5", "wifi_pass5"),
             ("TG_TOKEN", "tg_token"),
             ("GEMINI_KEY", "gemini_key"),
             ("CHAT_ID", "chat_id"),
@@ -2156,11 +2159,15 @@ fn load_config(nvs: &mut EspNvs<NvsDefault>) -> Result<Config> {
     let wifi_pass = nvs_get(nvs, "wifi_pass")
         .unwrap_or_default();
 
-    let wifi_ssid2 = nvs_get(nvs, "wifi_ssid2")
-        .unwrap_or_default();
-
-    let wifi_pass2 = nvs_get(nvs, "wifi_pass2")
-        .unwrap_or_default();
+    // Load up to 5 WiFi networks
+    let mut wifi = vec![(wifi_ssid, wifi_pass)];
+    for i in 2..=5u8 {
+        let sk = format!("wifi_ssid{}", i);
+        let pk = format!("wifi_pass{}", i);
+        let ssid = nvs_get(nvs, &sk).unwrap_or_default();
+        let pass = nvs_get(nvs, &pk).unwrap_or_default();
+        wifi.push((ssid, pass));
+    }
 
     let tg_token = nvs_get(nvs, "tg_token")
         .ok_or_else(|| anyhow::anyhow!("TG_TOKEN not set"))?;
@@ -2171,7 +2178,7 @@ fn load_config(nvs: &mut EspNvs<NvsDefault>) -> Result<Config> {
     let chat_id = nvs_get(nvs, "chat_id")
         .ok_or_else(|| anyhow::anyhow!("CHAT_ID not set"))?;
 
-    Ok(Config { wifi_ssid, wifi_pass, wifi_ssid2, wifi_pass2, tg_token, gemini_key, chat_id })
+    Ok(Config { wifi, tg_token, gemini_key, chat_id })
 }
 
 // ===== Main =====
@@ -2188,16 +2195,12 @@ fn main() -> Result<()> {
     let mut nvs = EspNvs::new(nvs_part.clone(), NVS_NS, true)?;
 
     let cfg = load_config(&mut nvs)?;
-    info!("Config loaded (WiFi: {})", cfg.wifi_ssid);
+    info!("Config loaded (WiFi: {})", cfg.wifi[0].0);
 
-    // WiFi - 多網路自動切換(主網路+備用網路，各試 20 秒)
+    // WiFi - 多網路自動切換(最多 5 組，各試 20 秒)
     let mut wifi = EspWifi::new(peripherals.modem, sysloop.clone(), Some(nvs_part))?;
-    let wifi_nets = [
-        (cfg.wifi_ssid.clone(), cfg.wifi_pass.clone()),
-        (cfg.wifi_ssid2.clone(), cfg.wifi_pass2.clone()),
-    ];
     let mut wifi_ok = false;
-    'wifi_init: for (ssid, pass) in wifi_nets.iter().filter(|(s, _)| !s.is_empty()) {
+    'wifi_init: for (ssid, pass) in cfg.wifi.iter().filter(|(s, _)| !s.is_empty()) {
         info!("WiFi: 嘗試連接 {}...", ssid);
         if wifi.is_started().unwrap_or(false) { let _ = wifi.stop(); }
         let ssid_hs = match ssid.as_str().try_into() {
@@ -2601,11 +2604,7 @@ fn main() -> Result<()> {
             last_wifi_health_check = now;
             if !wifi.is_connected().unwrap_or(false) {
                 warn!("WiFi health check: 連線已斷，嘗試重連..");
-                let recon_nets = [
-                    (cfg.wifi_ssid.clone(), cfg.wifi_pass.clone()),
-                    (cfg.wifi_ssid2.clone(), cfg.wifi_pass2.clone()),
-                ];
-                'health_recon: for (ssid, pass) in recon_nets.iter().filter(|(s, _)| !s.is_empty()) {
+                'health_recon: for (ssid, pass) in cfg.wifi.iter().filter(|(s, _)| !s.is_empty()) {
                     info!("Health reconnect: 嘗試 {}...", ssid);
                     if wifi.is_started().unwrap_or(false) { let _ = wifi.stop(); }
                     let _ = wifi.set_configuration(&Configuration::Client(ClientConfiguration {
@@ -2733,11 +2732,7 @@ fn main() -> Result<()> {
                     state.diag.log("WARN", "WiFi reconnect check triggered");
                     if !wifi.is_connected().unwrap_or(false) {
                         warn!("WiFi 已斷線，嘗試重新連接...");
-                        let recon_nets = [
-                            (cfg.wifi_ssid.clone(), cfg.wifi_pass.clone()),
-                            (cfg.wifi_ssid2.clone(), cfg.wifi_pass2.clone()),
-                        ];
-                        'recon: for (ssid, pass) in recon_nets.iter().filter(|(s, _)| !s.is_empty()) {
+                        'recon: for (ssid, pass) in cfg.wifi.iter().filter(|(s, _)| !s.is_empty()) {
                             info!("重連嘗試 {}...", ssid);
                             if wifi.is_started().unwrap_or(false) { let _ = wifi.stop(); }
                             let _ = wifi.set_configuration(&Configuration::Client(ClientConfiguration {
@@ -3049,8 +3044,17 @@ fn handle_text(
 ) {
     let trimmed = text.trim();
     // 指令不分大小寫：/TASKS = /tasks = /Tasks
+    // 只對指令名稱（第一個空白前）做小寫，保留參數原始大小寫（WiFi 密碼等）
     let trimmed_lc = trimmed.to_ascii_lowercase();
-    let trimmed = if trimmed_lc.starts_with('/') { trimmed_lc.as_str() } else { trimmed };
+    let trimmed_buf: String;
+    let trimmed = if trimmed_lc.starts_with('/') {
+        if let Some(sp) = trimmed.find(char::is_whitespace) {
+            trimmed_buf = format!("{}{}", &trimmed_lc[..sp], &trimmed[sp..]);
+            trimmed_buf.as_str()
+        } else {
+            trimmed_lc.as_str()
+        }
+    } else { trimmed };
 
     // ===== HIGHEST-PRIORITY: Emergency commands (always work, even when paused) =====
     match trimmed {
@@ -3097,9 +3101,9 @@ fn handle_text(
                  == System ==\n\
                  /status - System info\n\
                  /wifi - WiFi status\n\
-                 /wifi set SSID pass\n\
-                 /wifi set2 SSID pass (backup)\n\
-                 /wifi swap - switch main/backup\n\
+                 /wifi set SSID pass (slot 1)\n\
+                 /wifi set2~5 SSID pass\n\
+                 /wifi del <1~5> / swap / clear\n\
                  /model - Model & capabilities\n\
                  /model set flash|pro|3.1-pro\n\
                  /voice - Voice reply mode\n\
@@ -3742,61 +3746,66 @@ fn split_ssid_pass(input: &str) -> (String, String) {
     }
 }
 
+fn wifi_nvs_keys(slot: u8) -> (String, String) {
+    if slot == 1 {
+        ("wifi_ssid".to_string(), "wifi_pass".to_string())
+    } else {
+        (format!("wifi_ssid{}", slot), format!("wifi_pass{}", slot))
+    }
+}
+
 fn handle_wifi_command(cfg: &Config, nvs: &mut EspNvs<NvsDefault>, chat_id: i64, args: &str) {
     let trimmed = args.trim();
+    let trimmed_lower = trimmed.to_ascii_lowercase();
 
+    // /wifi (status) — 顯示所有已設定的 WiFi
     if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("status") {
-        let ssid1 = nvs_get(nvs, "wifi_ssid").unwrap_or_else(|| cfg.wifi_ssid.clone());
-        let has_pass1 = nvs_get(nvs, "wifi_pass")
-            .map(|v| !v.is_empty())
-            .unwrap_or(!cfg.wifi_pass.is_empty());
-        let ssid2 = nvs_get(nvs, "wifi_ssid2").unwrap_or_else(|| cfg.wifi_ssid2.clone());
-        let has_pass2 = nvs_get(nvs, "wifi_pass2")
-            .map(|v| !v.is_empty())
-            .unwrap_or(!cfg.wifi_pass2.is_empty());
-        let net2 = if ssid2.is_empty() {
-            "(未設定)".to_string()
-        } else {
-            format!("{} ({})", ssid2, if has_pass2 { "已設密碼" } else { "無密碼" })
-        };
-        let msg = format!(
-            "\u{1f4f6} WiFi 設定\n\n\
-             \u{1f4cc} 主要網路: {}\n\
-             \u{1f511} 密碼: {}\n\n\
-             \u{1f504} 備用網路: {}\n\n\
-             \u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\n\
-             指令:\n\
-             /wifi set SSID 密碼\n\
-             /wifi set2 SSID 密碼\n\
-             /wifi clear\n\
-             /wifi swap\n\n\
-             \u{1f4a1} 設定後系統自動重啟！",
-            ssid1,
-            if has_pass1 { "已設定" } else { "空白" },
-            net2
-        );
-        let _ = send_telegram(&cfg.tg_token, chat_id, &msg);
+        let mut lines = vec!["\u{1f4f6} WiFi \u{8a2d}\u{5b9a}\n".to_string()];
+        for i in 1..=5u8 {
+            let (sk, pk) = wifi_nvs_keys(i);
+            let ssid = nvs_get(nvs, &sk).unwrap_or_default();
+            let has_pass = nvs_get(nvs, &pk).map(|v| !v.is_empty()).unwrap_or(false);
+            if ssid.is_empty() {
+                lines.push(format!("  {} (\u{672a}\u{8a2d}\u{5b9a})", i));
+            } else {
+                let lock = if has_pass { " \u{1f512}" } else { "" };
+                lines.push(format!("  {} {}{}", i, ssid, lock));
+            }
+        }
+        lines.push(String::new());
+        lines.push("\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}".to_string());
+        lines.push("\u{6307}\u{4ee4}\u{ff1a}".to_string());
+        lines.push("/wifi set<N> SSID \u{5bc6}\u{78bc}".to_string());
+        lines.push("  N=1~5  \u{4f8b}: /wifi set SSID \u{5bc6}\u{78bc}".to_string());
+        lines.push("  \u{4f8b}: /wifi set3 SSID \u{5bc6}\u{78bc}".to_string());
+        lines.push("/wifi del <N>".to_string());
+        lines.push("/wifi swap".to_string());
+        lines.push("/wifi clear".to_string());
+        lines.push(String::new());
+        lines.push("\u{1f4a1} \u{8a2d}\u{5b9a}\u{5f8c}\u{7cfb}\u{7d71}\u{81ea}\u{52d5}\u{91cd}\u{555f}\u{ff01}".to_string());
+        let _ = send_telegram(&cfg.tg_token, chat_id, &lines.join("\n"));
         return;
     }
 
     // /wifi clear — 清空所有 WiFi 設定
     if trimmed.eq_ignore_ascii_case("clear") {
-        let _ = nvs.remove("wifi_ssid");
-        let _ = nvs.remove("wifi_pass");
-        let _ = nvs.remove("wifi_ssid2");
-        let _ = nvs.remove("wifi_pass2");
-        let _ = send_telegram(&cfg.tg_token, chat_id, "\u{2705} WiFi 設定已全部清空，系統將重啟。");
+        for i in 1..=5u8 {
+            let (sk, pk) = wifi_nvs_keys(i);
+            let _ = nvs.remove(&sk);
+            let _ = nvs.remove(&pk);
+        }
+        let _ = send_telegram(&cfg.tg_token, chat_id, "\u{2705} WiFi \u{8a2d}\u{5b9a}\u{5df2}\u{5168}\u{90e8}\u{6e05}\u{7a7a}\u{ff0c}\u{7cfb}\u{7d71}\u{5c07}\u{91cd}\u{555f}\u{3002}");
         unsafe { esp_idf_svc::sys::esp_restart(); }
     }
 
-    // /wifi swap — 主備互換
+    // /wifi swap — 1↔2 互換
     if trimmed.eq_ignore_ascii_case("swap") {
         let s1 = nvs_get(nvs, "wifi_ssid").unwrap_or_default();
         let p1 = nvs_get(nvs, "wifi_pass").unwrap_or_default();
         let s2 = nvs_get(nvs, "wifi_ssid2").unwrap_or_default();
         let p2 = nvs_get(nvs, "wifi_pass2").unwrap_or_default();
         if s2.is_empty() {
-            let _ = send_telegram(&cfg.tg_token, chat_id, "\u{274c} 沒有備用網路可以互換");
+            let _ = send_telegram(&cfg.tg_token, chat_id, "\u{274c} WiFi 2 \u{672a}\u{8a2d}\u{5b9a}\u{ff0c}\u{7121}\u{6cd5}\u{4e92}\u{63db}");
             return;
         }
         let _ = nvs.set_str("wifi_ssid", &s2);
@@ -3804,50 +3813,80 @@ fn handle_wifi_command(cfg: &Config, nvs: &mut EspNvs<NvsDefault>, chat_id: i64,
         let _ = nvs.set_str("wifi_ssid2", &s1);
         let _ = nvs.set_str("wifi_pass2", &p1);
         let _ = send_telegram(&cfg.tg_token, chat_id,
-            &format!("\u{2705} 主備互換完成！\n主要: {} \u{2192} {}\n系統重啟中...", s1, s2));
+            &format!("\u{2705} \u{4e92}\u{63db}\u{5b8c}\u{6210}\uff01\n1: {} \u{2192} {}\n\u{7cfb}\u{7d71}\u{91cd}\u{555f}\u{4e2d}...", s1, s2));
         unsafe { esp_idf_svc::sys::esp_restart(); }
     }
 
-    // /wifi set2 SSID PASSWORD — 設定備用網路
-    if let Some(rest) = trimmed.strip_prefix("set2 ").or_else(|| trimmed.strip_prefix("set2\t")) {
-        let (ssid, password) = split_ssid_pass(rest);
-        if ssid.is_empty() {
-            let _ = send_telegram(&cfg.tg_token, chat_id, "\u{274c} 用法：/wifi set2 SSID 密碼");
-            return;
+    // /wifi del <N> — 刪除指定插槽
+    if trimmed_lower.starts_with("del ") || trimmed_lower.starts_with("del\t") {
+        let rest = trimmed[4..].trim();
+        if let Ok(slot) = rest.parse::<u8>() {
+            if slot >= 1 && slot <= 5 {
+                let (sk, pk) = wifi_nvs_keys(slot);
+                let _ = nvs.remove(&sk);
+                let _ = nvs.remove(&pk);
+                let _ = send_telegram(&cfg.tg_token, chat_id,
+                    &format!("\u{2705} WiFi {} \u{5df2}\u{522a}\u{9664}", slot));
+                return;
+            }
         }
-        if nvs.set_str("wifi_ssid2", &ssid).is_ok() && nvs.set_str("wifi_pass2", &password).is_ok() {
-            let _ = send_telegram(&cfg.tg_token, chat_id,
-                &format!("\u{2705} 備用 WiFi 已設為 {}，下次斷線時自動切換！", ssid));
-        } else {
-            let _ = send_telegram(&cfg.tg_token, chat_id, "\u{274c} 備用 WiFi 寫入 NVS 失敗");
-        }
+        let _ = send_telegram(&cfg.tg_token, chat_id, "\u{274c} \u{7528}\u{6cd5}\u{ff1a}/wifi del <1~5>");
         return;
     }
 
-    // /wifi set SSID PASSWORD — 設定主要網路
-    if let Some(rest) = trimmed.strip_prefix("set ").or_else(|| trimmed.strip_prefix("set\t")) {
+    // /wifi set<N> SSID PASSWORD — 設定指定插槽 (set = set1, set2..set5)
+    // Parse slot number from "set", "set1", "set2" ... "set5"
+    let maybe_set = if trimmed_lower.starts_with("set") {
+        let after_set = &trimmed_lower[3..];
+        // "set SSID pass" → slot 1, rest starts after "set "
+        // "set2 SSID pass" → slot 2, rest starts after "set2 "
+        if after_set.starts_with(' ') || after_set.starts_with('\t') {
+            Some((1u8, &trimmed[4..]))  // "set " = 4 chars
+        } else if after_set.len() >= 2 {
+            let digit = after_set.as_bytes()[0];
+            let sep = after_set.as_bytes()[1];
+            if digit >= b'1' && digit <= b'5' && (sep == b' ' || sep == b'\t') {
+                Some((digit - b'0', &trimmed[5..]))  // "setN " = 5 chars
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    if let Some((slot, rest)) = maybe_set {
         let (ssid, password) = split_ssid_pass(rest);
         if ssid.is_empty() {
-            let _ = send_telegram(&cfg.tg_token, chat_id, "\u{274c} 用法：/wifi set SSID 密碼");
+            let _ = send_telegram(&cfg.tg_token, chat_id,
+                &format!("\u{274c} \u{7528}\u{6cd5}\u{ff1a}/wifi set{} SSID \u{5bc6}\u{78bc}", if slot == 1 { String::new() } else { slot.to_string() }));
             return;
         }
-        if nvs.set_str("wifi_ssid", &ssid).is_ok() && nvs.set_str("wifi_pass", &password).is_ok() {
+        let (sk, pk) = wifi_nvs_keys(slot);
+        if nvs.set_str(&sk, &ssid).is_ok() && nvs.set_str(&pk, &password).is_ok() {
+            let restart = slot == 1;
             let _ = send_telegram(&cfg.tg_token, chat_id,
-                &format!("\u{2705} WiFi 已更新為 {}，系統重啟中...", ssid));
-            unsafe { esp_idf_svc::sys::esp_restart(); }
+                &format!("\u{2705} WiFi {} \u{5df2}\u{8a2d}\u{70ba} {}{}", slot, ssid,
+                    if restart { "\n\u{7cfb}\u{7d71}\u{91cd}\u{555f}\u{4e2d}..." } else { "" }));
+            if restart {
+                unsafe { esp_idf_svc::sys::esp_restart(); }
+            }
         } else {
-            let _ = send_telegram(&cfg.tg_token, chat_id, "\u{274c} WiFi 寫入 NVS 失敗");
+            let _ = send_telegram(&cfg.tg_token, chat_id, "\u{274c} WiFi \u{5beb}\u{5165} NVS \u{5931}\u{6557}");
         }
         return;
     }
 
     let _ = send_telegram(&cfg.tg_token, chat_id,
-        "\u{1f4f6} WiFi 指令：\n\n\
-         /wifi — 查看目前設定\n\
-         /wifi set SSID 密碼\n\
-         /wifi set2 SSID 密碼 (備用)\n\
-         /wifi swap — 主備互換\n\
-         /wifi clear — 清空全部");
+        "\u{1f4f6} WiFi \u{6307}\u{4ee4}\u{ff1a}\n\n\
+         /wifi \u{2014} \u{67e5}\u{770b}\u{76ee}\u{524d}\u{8a2d}\u{5b9a}\n\
+         /wifi set SSID \u{5bc6}\u{78bc} (\u{4e3b}\u{7db2}\u{8def})\n\
+         /wifi set2~5 SSID \u{5bc6}\u{78bc}\n\
+         /wifi del <1~5>\n\
+         /wifi swap \u{2014} 1\u{2194}2\u{4e92}\u{63db}\n\
+         /wifi clear \u{2014} \u{6e05}\u{7a7a}\u{5168}\u{90e8}");
 }
 
 fn handle_audio_command(cfg: &Config, nvs: &mut EspNvs<NvsDefault>, state: &mut AppState, chat_id: i64, args: &str) {

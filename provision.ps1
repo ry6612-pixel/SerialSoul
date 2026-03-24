@@ -71,8 +71,7 @@ $json = ($payload | ConvertTo-Json -Compress)
 # Mask secrets in display
 $display = $json -replace '"TG_TOKEN":"[^"]*"', '"TG_TOKEN":"***"'
 $display = $display -replace '"GEMINI_KEY":"[^"]*"', '"GEMINI_KEY":"***"'
-$display = $display -replace '"WIFI_PASS":"[^"]*"', '"WIFI_PASS":"***"'
-$display = $display -replace '"WIFI_PASS2":"[^"]*"', '"WIFI_PASS2":"***"'
+$display = $display -replace '"WIFI_PASS\d*":"[^"]*"', '"WIFI_PASS*":"***"'
 $display = $display -replace '"CHAT_ID":"[^"]*"', '"CHAT_ID":"***"'
 Write-Host "Payload: $display" -ForegroundColor DarkGray
 

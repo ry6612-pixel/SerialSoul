@@ -17,14 +17,23 @@
 # - build.ps1 will prefer NOVACLAW_CONFIG or %USERPROFILE%\.novaclaw\secrets\user_config.txt
 # - repo-local user_config.txt is still supported only for backward compatibility.
 
-# ===== WiFi (Required) =====
+# ===== WiFi (Required — at least WiFi 1) =====
 # Primary WiFi network
 WIFI_SSID     = "YourWiFiName"
 WIFI_PASS     = "YourWiFiPassword"
 
-# Backup WiFi (optional — auto-failover when primary drops)
+# Backup WiFi 2~5 (optional — auto-failover when primary drops)
 WIFI_SSID2    = ""
 WIFI_PASS2    = ""
+
+WIFI_SSID3    = ""
+WIFI_PASS3    = ""
+
+WIFI_SSID4    = ""
+WIFI_PASS4    = ""
+
+WIFI_SSID5    = ""
+WIFI_PASS5    = ""
 
 # ===== Telegram Bot (Required) =====
 # 1. Open Telegram, search @BotFather → /newbot → copy the token
