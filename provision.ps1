@@ -17,16 +17,17 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# ── Auto-install git hooks from .githooks/ ──
+# ── Auto-install git hooks from .githooks/ (hash-verified) ──
 $hooksSource = Join-Path $PSScriptRoot ".githooks"
 $hooksDest   = Join-Path $PSScriptRoot ".git\hooks"
 if (Test-Path $hooksSource) {
     foreach ($hookFile in Get-ChildItem $hooksSource -File) {
         $dest = Join-Path $hooksDest $hookFile.Name
-        $needCopy = (-not (Test-Path $dest)) -or ($hookFile.LastWriteTimeUtc -gt (Get-Item $dest).LastWriteTimeUtc)
+        $srcHash = (Get-FileHash $hookFile.FullName -Algorithm SHA256).Hash
+        $needCopy = (-not (Test-Path $dest)) -or ($srcHash -ne (Get-FileHash $dest -Algorithm SHA256).Hash)
         if ($needCopy) {
             Copy-Item $hookFile.FullName $dest -Force
-            Write-Host "Hook installed: $($hookFile.Name)" -ForegroundColor Green
+            Write-Host "Hook installed: $($hookFile.Name) (hash mismatch — repaired)" -ForegroundColor Green
         }
     }
 }
