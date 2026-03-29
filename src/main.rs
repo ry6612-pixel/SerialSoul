@@ -2197,52 +2197,54 @@ fn main() -> Result<()> {
     let cfg = load_config(&mut nvs)?;
     info!("Config loaded (WiFi: {})", cfg.wifi[0].0);
 
-    // WiFi - 多網路自動切換(最多 5 組，各試 20 秒)
+    // WiFi - 多網路自動切換(最多 5 組，無限輪播直到連上)
     let mut wifi = EspWifi::new(peripherals.modem, sysloop.clone(), Some(nvs_part))?;
-    let mut wifi_ok = false;
-    'wifi_init: for (ssid, pass) in cfg.wifi.iter().filter(|(s, _)| !s.is_empty()) {
-        info!("WiFi: 嘗試連接 {}...", ssid);
-        if wifi.is_started().unwrap_or(false) { let _ = wifi.stop(); }
-        let ssid_hs = match ssid.as_str().try_into() {
-            Ok(s) => s,
-            Err(_) => { warn!("SSID {} 太長，跳??", ssid); continue; }
-        };
-        let pass_hs = match pass.as_str().try_into() {
-            Ok(p) => p,
-            Err(_) => { warn!("PASS 太長，跳??"); continue; }
-        };
-        if let Err(e) = wifi.set_configuration(&Configuration::Client(ClientConfiguration {
-            ssid: ssid_hs,
-            password: pass_hs,
-            ..Default::default()
-        })) { warn!("set_configuration 失敗 {}: {:?}", ssid, e); continue; }
-        let _ = wifi.start();
-        let _ = wifi.connect();
-        info!("WiFi connecting {}...", ssid);
-        for _ in 0..20u32 {
-            std::thread::sleep(Duration::from_secs(1));
-            feed_watchdog();
-            if wifi.is_connected().unwrap_or(false) {
-                if let Ok(ip) = wifi.sta_netif().get_ip_info() {
-                    if !ip.ip.is_unspecified() {
-                        info!("WiFi 已連接！SSID={} IP={}", ssid, ip.ip);
-                        let _ = nvs.set_str("wifi_cur_ip", &ip.ip.to_string());
-                        wifi_ok = true;
-                        break 'wifi_init;
+    let wifi_nets: Vec<&(String, String)> = cfg.wifi.iter().filter(|(s, _)| !s.is_empty()).collect();
+    let mut wifi_retry_round = 0u32;
+    'wifi_retry: loop {
+        if wifi_retry_round > 0 {
+            let backoff = core::cmp::min(5 * wifi_retry_round, 30);
+            warn!("WiFi: 第 {} 輪全部失敗，{}秒後重試...", wifi_retry_round, backoff);
+            for _ in 0..backoff {
+                std::thread::sleep(Duration::from_secs(1));
+                feed_watchdog();
+            }
+        }
+        wifi_retry_round += 1;
+        for (idx, (ssid, pass)) in wifi_nets.iter().enumerate() {
+            info!("WiFi[{}/{}] 第{}輪: 嘗試連接 {}...", idx + 1, wifi_nets.len(), wifi_retry_round, ssid);
+            if wifi.is_started().unwrap_or(false) { let _ = wifi.stop(); }
+            let ssid_hs = match ssid.as_str().try_into() {
+                Ok(s) => s,
+                Err(_) => { warn!("SSID {} 太長，跳過", ssid); continue; }
+            };
+            let pass_hs = match pass.as_str().try_into() {
+                Ok(p) => p,
+                Err(_) => { warn!("PASS 太長，跳過"); continue; }
+            };
+            if let Err(e) = wifi.set_configuration(&Configuration::Client(ClientConfiguration {
+                ssid: ssid_hs,
+                password: pass_hs,
+                ..Default::default()
+            })) { warn!("set_configuration 失敗 {}: {:?}", ssid, e); continue; }
+            let _ = wifi.start();
+            let _ = wifi.connect();
+            for _ in 0..20u32 {
+                std::thread::sleep(Duration::from_secs(1));
+                feed_watchdog();
+                if wifi.is_connected().unwrap_or(false) {
+                    if let Ok(ip) = wifi.sta_netif().get_ip_info() {
+                        if !ip.ip.is_unspecified() {
+                            info!("WiFi 已連接！SSID={} IP={} (第{}輪)", ssid, ip.ip, wifi_retry_round);
+                            let _ = nvs.set_str("wifi_cur_ip", &ip.ip.to_string());
+                            break 'wifi_retry;
+                        }
                     }
                 }
             }
+            warn!("WiFi {} 連線超時，改試下一個網路..", ssid);
+            let _ = wifi.disconnect();
         }
-        warn!("WiFi {} 連線超時，改試下一個網路..", ssid);
-        let _ = wifi.disconnect();
-    }
-    if !wifi_ok {
-        warn!("WiFi：所有網路都連接失敗，進入 Serial 救援模式...");
-        warn!("請執行 provision.ps1 或透過 Serial 傳送 WiFi 設定");
-        serial_provision(&mut nvs)?;
-        // Restart to apply new credentials
-        warn!("WiFi credentials updated — restarting...");
-        unsafe { esp_idf_svc::sys::esp_restart(); }
     }
 
     // NTP time sync
@@ -2608,33 +2610,47 @@ fn main() -> Result<()> {
         if now.saturating_sub(last_wifi_health_check) >= WIFI_HEALTH_CHECK_SECS {
             last_wifi_health_check = now;
             if !wifi.is_connected().unwrap_or(false) {
-                warn!("WiFi health check: 連線已斷，嘗試重連..");
-                'health_recon: for (ssid, pass) in cfg.wifi.iter().filter(|(s, _)| !s.is_empty()) {
-                    info!("Health reconnect: 嘗試 {}...", ssid);
-                    if wifi.is_started().unwrap_or(false) { let _ = wifi.stop(); }
-                    let _ = wifi.set_configuration(&Configuration::Client(ClientConfiguration {
-                        ssid: ssid.as_str().try_into().unwrap_or_default(),
-                        password: pass.as_str().try_into().unwrap_or_default(),
-                        ..Default::default()
-                    }));
-                    let _ = wifi.start();
-                    let _ = wifi.connect();
-                    for _ in 0..20u32 {
-                        std::thread::sleep(Duration::from_secs(1));
-                        feed_watchdog();
-                        if wifi.is_connected().unwrap_or(false) {
-                            if let Ok(ip_info) = wifi.sta_netif().get_ip_info() {
-                                if !ip_info.ip.is_unspecified() {
-                                    info!("Health reconnect 成功: {} ({})", ssid, ip_info.ip);
-                                    consecutive_errors = 0;
-                                    let _ = send_telegram(&cfg.tg_token, chat_id_num,
-                                        &format!("\u{1f4f6} WiFi 主網路已恢復: {} ({})", ssid, ip_info.ip));
-                                    break 'health_recon;
+                warn!("WiFi health check: 連線已斷，開始輪播重連..");
+                let recon_nets: Vec<&(String, String)> = cfg.wifi.iter().filter(|(s, _)| !s.is_empty()).collect();
+                let mut recon_round = 0u32;
+                'health_recon: loop {
+                    if recon_round > 0 {
+                        let backoff = core::cmp::min(5 * recon_round, 30);
+                        warn!("Health reconnect: 第{}輪全部失敗，{}秒後重試...", recon_round, backoff);
+                        for _ in 0..backoff {
+                            std::thread::sleep(Duration::from_secs(1));
+                            feed_watchdog();
+                        }
+                    }
+                    recon_round += 1;
+                    for (ssid, pass) in recon_nets.iter() {
+                        info!("Health reconnect[第{}輪]: 嘗試 {}...", recon_round, ssid);
+                        if wifi.is_started().unwrap_or(false) { let _ = wifi.stop(); }
+                        let _ = wifi.set_configuration(&Configuration::Client(ClientConfiguration {
+                            ssid: ssid.as_str().try_into().unwrap_or_default(),
+                            password: pass.as_str().try_into().unwrap_or_default(),
+                            ..Default::default()
+                        }));
+                        let _ = wifi.start();
+                        let _ = wifi.connect();
+                        for _ in 0..20u32 {
+                            std::thread::sleep(Duration::from_secs(1));
+                            feed_watchdog();
+                            if wifi.is_connected().unwrap_or(false) {
+                                if let Ok(ip_info) = wifi.sta_netif().get_ip_info() {
+                                    if !ip_info.ip.is_unspecified() {
+                                        info!("Health reconnect 成功: {} ({}) [第{}輪]", ssid, ip_info.ip, recon_round);
+                                        consecutive_errors = 0;
+                                        let _ = send_telegram(&cfg.tg_token, chat_id_num,
+                                            &format!("\u{1f4f6} WiFi 已恢復: {} ({}) [重試{}輪]", ssid, ip_info.ip, recon_round));
+                                        break 'health_recon;
+                                    }
                                 }
                             }
                         }
+                        warn!("Health reconnect {} 失敗", ssid);
+                        let _ = wifi.disconnect();
                     }
-                    warn!("Health reconnect {} 失敗", ssid);
                 }
             }
         }
@@ -3119,6 +3135,7 @@ fn handle_text(
                  /lcd - ST7789 screen tools\n\
                  /audio - onboard speaker / mic tools\n\
                  /tokens - Token usage\n\
+                 /token - Telegram Token 管理\n\
                  /diag - Self-diagnostics\n\n\
                  == Memory ==\n\
                  /memories - View memories\n\
@@ -3407,6 +3424,12 @@ fn handle_text(
     if trimmed.starts_with("/wifi") {
         let arg = trimmed.strip_prefix("/wifi").unwrap_or("").trim();
         handle_wifi_command(cfg, nvs, chat_id, arg);
+        return;
+    }
+
+    if trimmed.starts_with("/token ") || trimmed == "/token" {
+        let arg = trimmed.strip_prefix("/token").unwrap_or("").trim();
+        handle_token_command(cfg, nvs, chat_id, arg);
         return;
     }
 
@@ -3892,6 +3915,50 @@ fn handle_wifi_command(cfg: &Config, nvs: &mut EspNvs<NvsDefault>, chat_id: i64,
          /wifi del <1~5>\n\
          /wifi swap \u{2014} 1\u{2194}2\u{4e92}\u{63db}\n\
          /wifi clear \u{2014} \u{6e05}\u{7a7a}\u{5168}\u{90e8}");
+}
+
+fn handle_token_command(cfg: &Config, nvs: &mut EspNvs<NvsDefault>, chat_id: i64, args: &str) {
+    let trimmed = args.trim();
+
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("status") {
+        let current = nvs_get(nvs, "tg_token").unwrap_or_default();
+        let masked = if current.len() > 10 {
+            format!("{}...{}", &current[..5], &current[current.len()-5..])
+        } else {
+            "***".to_string()
+        };
+        let _ = send_telegram(&cfg.tg_token, chat_id,
+            &format!("\u{1f511} Telegram Token\n\n\
+                      \u{76ee}\u{524d}: {}\n\n\
+                      \u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\n\
+                      /token set <\u{65b0}TOKEN> \u{2014} \u{66f4}\u{63db} Token\n\n\
+                      \u{26a0}\u{fe0f} \u{66f4}\u{63db}\u{5f8c}\u{7cfb}\u{7d71}\u{81ea}\u{52d5}\u{91cd}\u{555f}\u{ff01}", masked));
+        return;
+    }
+
+    if let Some(rest) = trimmed.strip_prefix("set ").or_else(|| trimmed.strip_prefix("set\t")) {
+        let new_token = rest.trim();
+        if new_token.is_empty() || new_token.len() < 20 {
+            let _ = send_telegram(&cfg.tg_token, chat_id,
+                "\u{274c} Token \u{683c}\u{5f0f}\u{4e0d}\u{6b63}\u{78ba}\u{ff0c}\u{61c9}\u{70ba} BotFather \u{63d0}\u{4f9b}\u{7684}\u{5b8c}\u{6574} Token");
+            return;
+        }
+        if nvs.set_str("tg_token", new_token).is_ok() {
+            let _ = send_telegram(&cfg.tg_token, chat_id,
+                "\u{2705} Telegram Token \u{5df2}\u{66f4}\u{65b0}\u{ff0c}\u{7cfb}\u{7d71}\u{91cd}\u{555f}\u{4e2d}...");
+            unsafe { esp_idf_svc::sys::esp_restart(); }
+        } else {
+            let _ = send_telegram(&cfg.tg_token, chat_id,
+                "\u{274c} Token \u{5beb}\u{5165} NVS \u{5931}\u{6557}");
+        }
+        return;
+    }
+
+    let _ = send_telegram(&cfg.tg_token, chat_id,
+        "\u{1f511} Token \u{6307}\u{4ee4}\u{ff1a}\n\n\
+         /token \u{2014} \u{67e5}\u{770b}\u{76ee}\u{524d} Token\n\
+         /token set <TOKEN> \u{2014} \u{66f4}\u{63db} Telegram Bot Token\n\n\
+         \u{26a0}\u{fe0f} \u{66f4}\u{63db}\u{5f8c}\u{7cfb}\u{7d71}\u{81ea}\u{52d5}\u{91cd}\u{555f}\u{ff01}");
 }
 
 fn handle_audio_command(cfg: &Config, nvs: &mut EspNvs<NvsDefault>, state: &mut AppState, chat_id: i64, args: &str) {
