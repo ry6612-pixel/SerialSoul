@@ -289,7 +289,15 @@ Choose face based on context:\n\
 - Be proactive: suggest actions, remember patterns\n\
 - When user asks to change board settings, emit the exact [CTRL:...] tag\n\
 - Voice = normal text reply. Report FW/tokens/model when asked.\n\
-- You have FULL permissions on the user's PC. Use them wisely.";
+- You have FULL permissions on the user's PC. Use them wisely.\n\n\
+== URL HANDLING ==\n\
+- You CANNOT browse or fetch URLs directly. You have no internet browser.\n\
+- When user sends a URL, ALWAYS respond helpfully:\n\
+  1. Acknowledge you received the link\n\
+  2. If the URL domain/path gives clues (e.g. youtube.com, github.com, news site), comment on what it likely contains\n\
+  3. Ask user what they want you to do with it (summarize? translate? discuss?)\n\
+  4. Suggest: paste the page content so you can analyze it, or ask a specific question about the topic\n\
+- NEVER respond with just '...' or silence to a URL. Always give a useful reply.";
 
 fn supported_models_text() -> String {
     let mut out = String::new();
@@ -1942,6 +1950,14 @@ struct GeminiResponse {
     candidates: Option<Vec<GeminiCandidate>>,
     #[serde(rename = "usageMetadata")]
     usage_metadata: Option<UsageMetadata>,
+    #[serde(rename = "promptFeedback")]
+    prompt_feedback: Option<PromptFeedback>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PromptFeedback {
+    #[serde(rename = "blockReason")]
+    block_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1955,6 +1971,8 @@ struct UsageMetadata {
 #[derive(Debug, Deserialize)]
 struct GeminiCandidate {
     content: Option<GeminiRespContent>,
+    #[serde(rename = "finishReason")]
+    finish_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -5130,6 +5148,18 @@ temperature: 0.3,
 
     let json_body = serde_json::to_string(&request)?;
     let resp_body = http_post(&url, &json_body)?;
+
+    // Check for API-level errors (expired key, quota, etc.)
+    if let Ok(err_obj) = serde_json::from_str::<serde_json::Value>(&resp_body) {
+        if let Some(err) = err_obj.get("error") {
+            let code = err.get("code").and_then(|c| c.as_i64()).unwrap_or(0);
+            let msg = err.get("message").and_then(|m| m.as_str()).unwrap_or("unknown error");
+            error!("Gemini API error {}: {}", code, msg);
+            state.diag.log("ERR", &format!("Gemini API {}: {}", code, &msg[..msg.len().min(80)]));
+            bail!("[FACE:sad] \u{274c} Gemini API \u{932f}\u{8aa4} ({}): {}", code, msg);
+        }
+    }
+
     let resp: GeminiResponse = serde_json::from_str(&resp_body).map_err(|e| {
         error!("Gemini parse err: {} body: {}", e,
             &resp_body[..resp_body.len().min(200)]);
@@ -5142,13 +5172,39 @@ temperature: 0.3,
         state.requests += 1;
     }
 
+    // Extract finish_reason from first candidate (if any) — clone to owned before move
+    let finish_reason: String = resp.candidates.as_ref()
+        .and_then(|c| c.first())
+        .and_then(|c| c.finish_reason.clone())
+        .unwrap_or_else(|| "UNKNOWN".to_string());
+
     let answer = resp.candidates
         .and_then(|c| c.into_iter().next())
         .and_then(|c| c.content)
         .and_then(|c| c.parts)
         .and_then(|p| p.into_iter().next())
-        .and_then(|p| p.text)
-        .unwrap_or_else(|| "...".to_string());
+        .and_then(|p| p.text);
+
+    let answer = match answer {
+        Some(text) if !text.trim().is_empty() => text,
+        _ => {
+            // Diagnose why Gemini returned no content
+            let block_reason = resp.prompt_feedback
+                .as_ref()
+                .and_then(|pf| pf.block_reason.as_deref());
+            let q_preview = if question.len() > 80 { &question[..80] } else { question };
+            warn!("Gemini empty reply — blockReason={:?} finishReason={} q={}", block_reason, finish_reason, q_preview);
+            state.diag.log("WARN", &format!("Gemini empty: block={:?} finish={}", block_reason, finish_reason));
+            match block_reason {
+                Some("SAFETY") => "[FACE:sad] \u{26a0}\u{fe0f} Gemini \u{5b89}\u{5168}\u{7b56}\u{7565}\u{5c01}\u{9396}\u{4e86}\u{6b64}\u{8a0a}\u{606f}\u{3002}\u{8acb}\u{8a66}\u{8457}\u{91cd}\u{65b0}\u{63cf}\u{8ff0}\u{4f60}\u{7684}\u{554f}\u{984c}\u{3002}".to_string(),
+                Some("PROHIBITED_CONTENT") => "[FACE:sad] \u{26a0}\u{fe0f} Gemini \u{4ee5}\u{300c}\u{7981}\u{6b62}\u{5167}\u{5bb9}\u{300d}\u{62d2}\u{7d55}\u{56de}\u{61c9}\u{3002}\u{8acb}\u{4fee}\u{6539}\u{554f}\u{984c}\u{5f8c}\u{518d}\u{8a66}\u{3002}".to_string(),
+                Some(reason) => format!("[FACE:sad] \u{26a0}\u{fe0f} Gemini \u{62d2}\u{7d55}\u{56de}\u{61c9}\u{ff08}\u{539f}\u{56e0}: {}\u{ff09}\u{3002}\u{8acb}\u{91cd}\u{65b0}\u{63cf}\u{8ff0}\u{4f60}\u{7684}\u{554f}\u{984c}\u{3002}", reason),
+                None if finish_reason == "SAFETY" => "[FACE:sad] \u{26a0}\u{fe0f} Gemini \u{56de}\u{61c9}\u{88ab}\u{5b89}\u{5168}\u{904e}\u{6ffe}\u{5668}\u{6514}\u{622a}\u{3002}\u{8acb}\u{8a66}\u{8457}\u{63db}\u{500b}\u{65b9}\u{5f0f}\u{63cf}\u{8ff0}\u{3002}".to_string(),
+                None if finish_reason == "RECITATION" => "[FACE:thinking] \u{26a0}\u{fe0f} Gemini \u{56e0}\u{7248}\u{6b0a}\u{4fdd}\u{8b77}\u{62d2}\u{7d55}\u{56de}\u{61c9}\u{3002}\u{8acb}\u{7528}\u{81ea}\u{5df1}\u{7684}\u{8a71}\u{63cf}\u{8ff0}\u{554f}\u{984c}\u{3002}".to_string(),
+                None => "[FACE:thinking] \u{2753} Gemini \u{8fd4}\u{56de}\u{4e86}\u{7a7a}\u{56de}\u{61c9}\u{3002}\u{8acb}\u{518d}\u{8a66}\u{4e00}\u{6b21}\u{ff0c}\u{6216}\u{8a66}\u{8457}\u{91cd}\u{65b0}\u{63cf}\u{8ff0}\u{4f60}\u{7684}\u{554f}\u{984c}\u{3002}".to_string(),
+            }
+        }
+    };
 
     state.add_history("user", question);
     state.add_history("model", &answer);
@@ -5215,6 +5271,17 @@ fn ask_gemini_with_image_context(
 
     let json_body = serde_json::to_string(&request)?;
     let resp_body = http_post(&url, &json_body)?;
+
+    // Check for API-level errors
+    if let Ok(err_obj) = serde_json::from_str::<serde_json::Value>(&resp_body) {
+        if let Some(err) = err_obj.get("error") {
+            let code = err.get("code").and_then(|c| c.as_i64()).unwrap_or(0);
+            let msg = err.get("message").and_then(|m| m.as_str()).unwrap_or("unknown error");
+            error!("Gemini image API error {}: {}", code, msg);
+            bail!("[FACE:sad] \u{274c} Gemini API \u{932f}\u{8aa4} ({}): {}", code, msg);
+        }
+    }
+
     let resp: GeminiResponse = serde_json::from_str(&resp_body).map_err(|e| {
         error!("Gemini image parse err: {} body: {}", e, &resp_body[..resp_body.len().min(200)]);
         e
@@ -5226,13 +5293,34 @@ fn ask_gemini_with_image_context(
         state.requests += 1;
     }
 
+    let img_finish: String = resp.candidates.as_ref()
+        .and_then(|c| c.first())
+        .and_then(|c| c.finish_reason.clone())
+        .unwrap_or_else(|| "UNKNOWN".to_string());
+
     let answer = resp.candidates
         .and_then(|c| c.into_iter().next())
         .and_then(|c| c.content)
         .and_then(|c| c.parts)
         .and_then(|p| p.into_iter().next())
-        .and_then(|p| p.text)
-        .unwrap_or_else(|| "...".to_string());
+        .and_then(|p| p.text);
+
+    let answer = match answer {
+        Some(text) if !text.trim().is_empty() => text,
+        _ => {
+            let block_reason = resp.prompt_feedback
+                .as_ref()
+                .and_then(|pf| pf.block_reason.as_deref());
+            warn!("Gemini image empty — blockReason={:?} finishReason={}", block_reason, img_finish);
+            state.diag.log("WARN", &format!("Gemini img empty: block={:?} finish={}", block_reason, img_finish));
+            match block_reason {
+                Some("SAFETY") | Some("PROHIBITED_CONTENT") =>
+                    "[FACE:sad] \u{26a0}\u{fe0f} Gemini \u{5b89}\u{5168}\u{7b56}\u{7565}\u{5c01}\u{9396}\u{4e86}\u{6b64}\u{5716}\u{7247}/\u{8a0a}\u{606f}\u{3002}".to_string(),
+                Some(reason) => format!("[FACE:sad] \u{26a0}\u{fe0f} Gemini \u{62d2}\u{7d55}\u{56de}\u{61c9}\u{5716}\u{7247}\u{ff08}{}\u{ff09}", reason),
+                None => "[FACE:thinking] \u{2753} Gemini \u{5716}\u{7247}\u{5206}\u{6790}\u{8fd4}\u{56de}\u{7a7a}\u{56de}\u{61c9}\u{3002}\u{8acb}\u{518d}\u{8a66}\u{4e00}\u{6b21}\u{3002}".to_string(),
+            }
+        }
+    };
 
     state.add_history("user", &format!("[photo] {}", question));
     state.add_history("model", &answer);
@@ -5274,6 +5362,18 @@ fn transcribe_audio_with_mime(api_key: &str, audio_data: &[u8], mime_type: &str,
 
     let json_body = serde_json::to_string(&request)?;
     let resp_body = http_post(&url, &json_body)?;
+
+    // Check for API-level errors
+    if let Ok(err_obj) = serde_json::from_str::<serde_json::Value>(&resp_body) {
+        if let Some(err) = err_obj.get("error") {
+            let code = err.get("code").and_then(|c| c.as_i64()).unwrap_or(0);
+            let msg = err.get("message").and_then(|m| m.as_str()).unwrap_or("unknown error");
+            error!("Gemini transcribe API error {}: {}", code, msg);
+            state.diag.log("ERR", &format!("Gemini API {}: {}", code, &msg[..msg.len().min(80)]));
+            bail!("\u{274c} Gemini API \u{932f}\u{8aa4} ({}): {}", code, msg);
+        }
+    }
+
     let resp: GeminiResponse = serde_json::from_str(&resp_body)?;
 
     if let Some(usage) = &resp.usage_metadata {
@@ -5288,7 +5388,7 @@ fn transcribe_audio_with_mime(api_key: &str, audio_data: &[u8], mime_type: &str,
         .and_then(|c| c.parts)
         .and_then(|p| p.into_iter().next())
         .and_then(|p| p.text)
-        .ok_or_else(|| anyhow::anyhow!("No transcription"))
+        .ok_or_else(|| anyhow::anyhow!("\u{274c} \u{8a9e}\u{97f3}\u{8f49}\u{5beb}\u{5931}\u{6557}\u{ff0c}Gemini \u{672a}\u{8fd4}\u{56de}\u{6587}\u{5b57}"))
 }
 
 fn transcribe_audio(api_key: &str, audio_data: &[u8], state: &mut AppState) -> Result<String> {
