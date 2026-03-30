@@ -3451,6 +3451,12 @@ fn handle_text(
         return;
     }
 
+    if trimmed.starts_with("/key ") || trimmed == "/key" {
+        let arg = trimmed.strip_prefix("/key").unwrap_or("").trim();
+        handle_key_command(cfg, nvs, chat_id, arg);
+        return;
+    }
+
     if trimmed.starts_with("/email") {
         let arg = trimmed.strip_prefix("/email").unwrap_or("").trim();
         handle_direct_email(cfg, nvs, chat_id, arg);
@@ -3976,6 +3982,49 @@ fn handle_token_command(cfg: &Config, nvs: &mut EspNvs<NvsDefault>, chat_id: i64
         "\u{1f511} Token \u{6307}\u{4ee4}\u{ff1a}\n\n\
          /token \u{2014} \u{67e5}\u{770b}\u{76ee}\u{524d} Token\n\
          /token set <TOKEN> \u{2014} \u{66f4}\u{63db} Telegram Bot Token\n\n\
+         \u{26a0}\u{fe0f} \u{66f4}\u{63db}\u{5f8c}\u{7cfb}\u{7d71}\u{81ea}\u{52d5}\u{91cd}\u{555f}\u{ff01}");
+}
+
+fn handle_key_command(cfg: &Config, nvs: &mut EspNvs<NvsDefault>, chat_id: i64, args: &str) {
+    let trimmed = args.trim();
+
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("status") {
+        let current = nvs_get(nvs, "gemini_key").unwrap_or_default();
+        let masked = if current.len() > 10 {
+            format!("{}...{}", &current[..5], &current[current.len()-3..])
+        } else {
+            "***".to_string()
+        };
+        let _ = send_telegram(&cfg.tg_token, chat_id,
+            &format!("\u{1f511} Gemini API Key\n\n\
+                      \u{76ee}\u{524d}: {}\n\n\
+                      /key set <KEY> \u{2014} \u{66f4}\u{63db} Gemini API Key\n\n\
+                      \u{26a0}\u{fe0f} \u{66f4}\u{63db}\u{5f8c}\u{7cfb}\u{7d71}\u{81ea}\u{52d5}\u{91cd}\u{555f}\u{ff01}", masked));
+        return;
+    }
+
+    if let Some(rest) = trimmed.strip_prefix("set ").or_else(|| trimmed.strip_prefix("set\t")) {
+        let new_key = rest.trim();
+        if new_key.is_empty() || !new_key.starts_with("AIza") {
+            let _ = send_telegram(&cfg.tg_token, chat_id,
+                "\u{274c} Key \u{683c}\u{5f0f}\u{4e0d}\u{6b63}\u{78ba}\u{ff0c}\u{61c9}\u{70ba} AIza... \u{958b}\u{982d}\u{7684} Gemini API Key");
+            return;
+        }
+        if nvs.set_str("gemini_key", new_key).is_ok() {
+            let _ = send_telegram(&cfg.tg_token, chat_id,
+                "\u{2705} Gemini API Key \u{5df2}\u{66f4}\u{65b0}\u{ff0c}\u{7cfb}\u{7d71}\u{91cd}\u{555f}\u{4e2d}...");
+            unsafe { esp_idf_svc::sys::esp_restart(); }
+        } else {
+            let _ = send_telegram(&cfg.tg_token, chat_id,
+                "\u{274c} Key \u{5beb}\u{5165} NVS \u{5931}\u{6557}");
+        }
+        return;
+    }
+
+    let _ = send_telegram(&cfg.tg_token, chat_id,
+        "\u{1f511} Gemini Key \u{6307}\u{4ee4}\u{ff1a}\n\n\
+         /key \u{2014} \u{67e5}\u{770b}\u{76ee}\u{524d} Key\n\
+         /key set <KEY> \u{2014} \u{66f4}\u{63db} Gemini API Key\n\n\
          \u{26a0}\u{fe0f} \u{66f4}\u{63db}\u{5f8c}\u{7cfb}\u{7d71}\u{81ea}\u{52d5}\u{91cd}\u{555f}\u{ff01}");
 }
 
