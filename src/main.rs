@@ -95,7 +95,7 @@ const TTS_PROXY_URL_KEY: &str = "tts_proxy_url";
 const TTS_PROXY_VOICE_KEY: &str = "tts_proxy_voice";
 
 // ===== BLE Provisioning =====
-const BLE_DEVICE_NAME: &str = "NovaClaw-ETHAN";
+const BLE_DEVICE_NAME: &str = "SerialSoul-ETHAN";
 const BLE_AUTH_PIN_DEFAULT: &str = "e93TELEGRAM2k7";
 // Nordic UART Service UUIDs
 const NUS_SERVICE_UUID: &str = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
@@ -2227,7 +2227,7 @@ fn load_config(nvs: &mut EspNvs<NvsDefault>) -> Result<Config> {
 ///   Phone→ESP: "SET <nvs_key> <val>"→ "OK"
 ///   Phone→ESP: "LIST"               → comma-separated key list
 ///   Phone→ESP: "SAVE"               → "OK RESTART" + reboot
-///   Phone→ESP: "PING"               → "PONG NovaClaw vX.Y.Z"
+///   Phone→ESP: "PING"               → "PONG SerialSoul vX.Y.Z"
 fn start_ble_provisioning(nvs_part: EspDefaultNvsPartition) {
     // BLE setup runs inline — NimBLE owns all objects via Arc/static refs,
     // callbacks run on NimBLE's internal task, no need for a dedicated thread.
@@ -2270,7 +2270,7 @@ fn start_ble_provisioning(nvs_part: EspDefaultNvsPartition) {
         uuid128!(NUS_TX_UUID),
         NimbleProperties::NOTIFY,
     );
-    tx_char.lock().set_value(b"NovaClaw ready");
+    tx_char.lock().set_value(b"SerialSoul ready");
 
     // RX: Phone -> ESP (write)
     let tx = tx_char.clone();
@@ -2293,7 +2293,7 @@ fn start_ble_provisioning(nvs_part: EspDefaultNvsPartition) {
                 };
 
                 if cmd.eq_ignore_ascii_case("PING") {
-                    respond(&format!("PONG NovaClaw v{}", FW_VERSION));
+                    respond(&format!("PONG SerialSoul v{}", FW_VERSION));
                     return;
                 }
 
@@ -2584,10 +2584,8 @@ fn main() -> Result<()> {
         }
     }
 
-    // BLE provisioning is deferred to /ble command to avoid WiFi radio contention.
-    // NimBLE advertising causes wifi:m f null errors that break TLS handshakes.
+    // Store NVS partition for BLE — will start after boot notification succeeds
     BLE_NVS_PART.set(nvs_part_ble).ok();
-    info!("BLE provisioning available via /ble command (serial or Telegram)");
 
     // BOOT button (GPIO0) ??Push-to-Talk
     std::thread::Builder::new()
@@ -2668,6 +2666,14 @@ fn main() -> Result<()> {
         Err(e) => error!("Boot notify failed: {:?}", e),
     }
     let _ = show_ready_screen(&lcd_pins);
+
+    // Start BLE AFTER boot notification (WiFi/TLS is stable by now)
+    if let Some(part) = BLE_NVS_PART.get() {
+        BLE_INITIALIZED.store(true, Ordering::SeqCst);
+        start_ble_provisioning(part.clone());
+    } else {
+        warn!("BLE: NVS partition not available, BLE disabled");
+    }
 
     // Main loop
     info!("=== {} Telegram Bot ready ===", BOT_NAME);
@@ -3677,26 +3683,14 @@ fn handle_text(
         return;
     }
 
-    if trimmed == "/ble" || trimmed == "/ble on" {
-        if BLE_INITIALIZED.load(Ordering::SeqCst) {
-            let _ = send_telegram(&cfg.tg_token, chat_id,
-                &format!("\u{1f4f6} BLE 已在運行中\n裝置名稱: {}\n\n\
-                          使用 NovaClaw App 連線", BLE_DEVICE_NAME));
-        } else {
-            if let Some(part) = BLE_NVS_PART.get() {
-                BLE_INITIALIZED.store(true, Ordering::SeqCst);
-                start_ble_provisioning(part.clone());
-                let _ = send_telegram(&cfg.tg_token, chat_id,
-                    &format!("\u{1f4f6} BLE 已啟動！\n裝置名稱: {}\n\n\
-                              使用 NovaClaw App 搜尋並連線\n\
-                              輸入密碼後可修改：\n\
-                              • WiFi / Telegram / Gemini 設定\n\
-                              • BLE 連線密碼\n\n\
-                              \u{26a0}\u{fe0f} BLE 啟動後 WiFi 可能偶爾不穩", BLE_DEVICE_NAME));
-            } else {
-                let _ = send_telegram(&cfg.tg_token, chat_id, "\u{274c} BLE 初始化失敗");
-            }
-        }
+    if trimmed == "/ble" {
+        let status = if BLE_INITIALIZED.load(Ordering::SeqCst) { "運行中" } else { "未啟動" };
+        let _ = send_telegram(&cfg.tg_token, chat_id,
+            &format!("\u{1f4f6} BLE 藍牙\n裝置名稱: {}\n狀態: {}\n\n\
+                      使用 SerialSoul App 搜尋並連線\n\
+                      輸入密碼後可修改：\n\
+                      • WiFi / Telegram / Gemini 設定\n\
+                      • BLE 連線密碼", BLE_DEVICE_NAME, status));
         return;
     }
 

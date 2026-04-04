@@ -1,4 +1,4 @@
-package com.novaclaw.bleconfig
+package com.serialsoul.bleconfig
 
 import android.annotation.SuppressLint
 import android.bluetooth.*
@@ -12,7 +12,7 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
- * NovaClaw BLE Manager — connects to ESP32 via Nordic UART Service (NUS).
+ * SerialSoul BLE Manager — connects to ESP32 via Nordic UART Service (NUS).
  *
  * Protocol:
  *   AUTH <pin>         → OK / FAIL
@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
  *   SET <key> <value>  → OK
  *   LIST               → comma-separated keys
  *   SAVE               → OK RESTART (device reboots)
- *   PING               → PONG NovaClaw vX.Y.Z
+ *   PING               → PONG SerialSoul vX.Y.Z
  */
 class BleManager(private val context: Context) {
 
@@ -69,7 +69,7 @@ class BleManager(private val context: Context) {
         @SuppressLint("MissingPermission")
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             val name = result.device.name ?: return
-            if (!name.contains("NovaClaw", ignoreCase = true)) return
+            if (!name.contains("SerialSoul", ignoreCase = true)) return
             val existing = _devices.value.toMutableList()
             val idx = existing.indexOfFirst { it.address == result.device.address }
             val item = ScannedDevice(name, result.device.address, result.rssi, result.device)

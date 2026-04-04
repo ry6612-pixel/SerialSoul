@@ -1,4 +1,4 @@
-package com.novaclaw.bleconfig
+package com.serialsoul.bleconfig
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity() {
                     onSurface = Color.White,
                 )
             ) {
-                NovaClawApp(bleManager, ::requestPermAndScan)
+                SerialSoulApp(bleManager, ::requestPermAndScan)
             }
         }
     }
@@ -98,7 +98,7 @@ class MainActivity : ComponentActivity() {
 // ============================================================
 
 @Composable
-fun NovaClawApp(ble: BleManager, onScan: () -> Unit) {
+fun SerialSoulApp(ble: BleManager, onScan: () -> Unit) {
     val connState by ble.state.collectAsState()
     val scope = rememberCoroutineScope()
 
@@ -129,7 +129,7 @@ fun ScanScreen(ble: BleManager, onScan: () -> Unit) {
             .padding(16.dp)
     ) {
         Text(
-            "NovaClaw",
+            "SerialSoul",
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
@@ -159,7 +159,7 @@ fun ScanScreen(ble: BleManager, onScan: () -> Unit) {
             Spacer(modifier = Modifier.height(32.dp))
             CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
             Spacer(modifier = Modifier.height(8.dp))
-            Text("搜尋 NovaClaw 裝置中...", modifier = Modifier.align(Alignment.CenterHorizontally), color = Color.Gray)
+            Text("搜尋 SerialSoul 裝置中...", modifier = Modifier.align(Alignment.CenterHorizontally), color = Color.Gray)
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -362,7 +362,7 @@ fun ConfigScreen(ble: BleManager) {
                 Icon(Icons.Default.Bluetooth, null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(8.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("NovaClaw 設定", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text("SerialSoul 設定", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     Text(
                         fwVersion.ifEmpty { "已連線" },
                         fontSize = 12.sp,

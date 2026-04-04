@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.novaclaw.bleconfig"
+    namespace = "com.serialsoul.bleconfig"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.novaclaw.bleconfig"
+        applicationId = "com.serialsoul.bleconfig"
         minSdk = 26
         targetSdk = 34
         versionCode = 1

@@ -12,14 +12,14 @@
 
     <application
         android:allowBackup="true"
-        android:label="NovaClaw"
+        android:label="SerialSoul"
         android:supportsRtl="true"
-        android:theme="@style/Theme.NovaClaw">
+        android:theme="@style/Theme.SerialSoul">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.NovaClaw">
+            android:theme="@style/Theme.SerialSoul">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

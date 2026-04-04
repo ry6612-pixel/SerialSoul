@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "NovaClaw"
+rootProject.name = "SerialSoul"
 include(":app")
