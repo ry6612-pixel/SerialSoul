@@ -41,11 +41,15 @@ use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader};
 use std::sync::mpsc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 // BLE provisioning
 use esp32_nimble::{uuid128, BLEDevice, NimbleProperties, BLEAdvertisementData};
+
+/// BLE is started on-demand (/ble command) to avoid WiFi radio contention.
+static BLE_INITIALIZED: AtomicBool = AtomicBool::new(false);
+static BLE_NVS_PART: OnceLock<EspDefaultNvsPartition> = OnceLock::new();
 
 /// Feed the task watchdog to prevent resets during long blocking operations
 fn feed_watchdog() {
@@ -2394,8 +2398,14 @@ fn start_ble_provisioning(nvs_part: EspDefaultNvsPartition) {
             adv_data.add_service_uuid(uuid128!(NUS_SERVICE_UUID));
 
             let adv = device.get_advertising();
-            if let Err(e) = adv.lock().set_data(&mut adv_data) {
-                error!("BLE: set_data failed: {:?}", e);
+            {
+                let mut adv_lock = adv.lock();
+                // Slow advertising: 1–2 sec interval to avoid WiFi radio contention
+                adv_lock.min_interval(1600); // 1600 * 0.625ms = 1000ms
+                adv_lock.max_interval(3200); // 3200 * 0.625ms = 2000ms
+                if let Err(e) = adv_lock.set_data(&mut adv_data) {
+                    error!("BLE: set_data failed: {:?}", e);
+                }
             }
             match adv.lock().start() {
                 Ok(_) => info!("BLE: advertising as '{}' ready", BLE_DEVICE_NAME),
@@ -2574,9 +2584,10 @@ fn main() -> Result<()> {
         }
     }
 
-    // Start BLE provisioning AFTER camera DMA (needs contiguous internal SRAM)
-    // but BEFORE Telegram TLS / ESP-SR which consume more heap
-    start_ble_provisioning(nvs_part_ble);
+    // BLE provisioning is deferred to /ble command to avoid WiFi radio contention.
+    // NimBLE advertising causes wifi:m f null errors that break TLS handshakes.
+    BLE_NVS_PART.set(nvs_part_ble).ok();
+    info!("BLE provisioning available via /ble command (serial or Telegram)");
 
     // BOOT button (GPIO0) ??Push-to-Talk
     std::thread::Builder::new()
@@ -3666,18 +3677,26 @@ fn handle_text(
         return;
     }
 
-    if trimmed == "/ble" {
-        let _ = send_telegram(&cfg.tg_token, chat_id,
-            &format!("\u{1f4f6} BLE Provisioning\n\n\
-                      裝置名稱: {}\n\
-                      狀態: 廣播中\n\n\
-                      使用 NovaClaw Android App 連線後\n\
-                      輸入密碼即可修改：\n\
-                      • WiFi 設定\n\
-                      • Telegram Token\n\
-                      • Gemini API Key\n\
-                      • Chat ID\n\
-                      • 模型 / 語音模式", BLE_DEVICE_NAME));
+    if trimmed == "/ble" || trimmed == "/ble on" {
+        if BLE_INITIALIZED.load(Ordering::SeqCst) {
+            let _ = send_telegram(&cfg.tg_token, chat_id,
+                &format!("\u{1f4f6} BLE 已在運行中\n裝置名稱: {}\n\n\
+                          使用 NovaClaw App 連線", BLE_DEVICE_NAME));
+        } else {
+            if let Some(part) = BLE_NVS_PART.get() {
+                BLE_INITIALIZED.store(true, Ordering::SeqCst);
+                start_ble_provisioning(part.clone());
+                let _ = send_telegram(&cfg.tg_token, chat_id,
+                    &format!("\u{1f4f6} BLE 已啟動！\n裝置名稱: {}\n\n\
+                              使用 NovaClaw App 搜尋並連線\n\
+                              輸入密碼後可修改：\n\
+                              • WiFi / Telegram / Gemini 設定\n\
+                              • BLE 連線密碼\n\n\
+                              \u{26a0}\u{fe0f} BLE 啟動後 WiFi 可能偶爾不穩", BLE_DEVICE_NAME));
+            } else {
+                let _ = send_telegram(&cfg.tg_token, chat_id, "\u{274c} BLE 初始化失敗");
+            }
+        }
         return;
     }
 
