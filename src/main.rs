@@ -1,7 +1,8 @@
-//! ETHAN ESP32-S3 AI Assistant Firmware v5.2.0
+//! ETHAN ESP32-S3 AI Assistant Firmware v5.3.0
 //!
 //! Features:
 //!   - Telegram Bot with voice message transcription (Gemini multimodal)
+//!   - BLE provisioning (NUS) — configure via Android app over Bluetooth
 //!   - Smart reminder / scheduler system (interval, daily, once)
 //!   - USB Serial PC Driver protocol (JSON Lines)
 //!   - Gemini-driven PC control (shell, file, excel, email, desktop)
@@ -40,8 +41,11 @@ use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader};
 use std::sync::mpsc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+// BLE provisioning
+use esp32_nimble::{uuid128, BLEDevice, NimbleProperties, BLEAdvertisementData};
 
 /// Feed the task watchdog to prevent resets during long blocking operations
 fn feed_watchdog() {
@@ -57,7 +61,7 @@ use crate::board_hw::{
 // ===== Constants =====
 
 const BOT_NAME: &str = "ETHAN";
-const FW_VERSION: &str = "5.2.0";
+const FW_VERSION: &str = "5.3.0";
 const DEFAULT_GEMINI_MODEL: &str = "gemini-3-flash-preview";
 const TRANSCRIBE_MODEL: &str = "gemini-3-flash-preview";
 const MAX_MEMORIES: usize = 30;
@@ -85,6 +89,14 @@ const TTS_CACHE_MAX: usize = 8;
 const TG_LAST_UPDATE_ID_KEY: &str = "tg_last_upd";
 const TTS_PROXY_URL_KEY: &str = "tts_proxy_url";
 const TTS_PROXY_VOICE_KEY: &str = "tts_proxy_voice";
+
+// ===== BLE Provisioning =====
+const BLE_DEVICE_NAME: &str = "NovaClaw-ETHAN";
+const BLE_AUTH_PIN_DEFAULT: &str = "e93TELEGRAM2k7";
+// Nordic UART Service UUIDs
+const NUS_SERVICE_UUID: &str = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+const NUS_RX_UUID: &str = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
+const NUS_TX_UUID: &str = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
 
 // ===== Gemini Rate Limiter & Pause =====
 const MAX_GEMINI_CALLS_PER_WINDOW: u32 = 5;
@@ -1129,7 +1141,10 @@ fn usb_send_pc_cmd(cmd: &str, args: &serde_json::Value, chat_id: i64) {
 
 fn spawn_serial_command_reader() -> mpsc::Receiver<String> {
     let (tx, rx) = mpsc::channel();
-    std::thread::spawn(move || {
+    std::thread::Builder::new()
+        .name("serial".into())
+        .stack_size(4096)
+        .spawn(move || {
         let stdin = std::io::stdin();
         let mut reader = BufReader::new(stdin.lock());
         loop {
@@ -1145,7 +1160,7 @@ fn spawn_serial_command_reader() -> mpsc::Receiver<String> {
                 Err(_) => std::thread::sleep(Duration::from_millis(250)),
             }
         }
-    });
+    }).expect("serial thread spawn");
     rx
 }
 
@@ -2199,6 +2214,195 @@ fn load_config(nvs: &mut EspNvs<NvsDefault>) -> Result<Config> {
     Ok(Config { wifi, tg_token, gemini_key, chat_id })
 }
 
+// ===== BLE Provisioning (NUS — Nordic UART Service) =====
+
+/// NVS key→value config commands handled over BLE.
+/// Protocol:
+///   Phone→ESP: "AUTH <pin>"         → "OK" / "FAIL"
+///   Phone→ESP: "GET <nvs_key>"      → "OK <value>"  (masked for secrets)
+///   Phone→ESP: "SET <nvs_key> <val>"→ "OK"
+///   Phone→ESP: "LIST"               → comma-separated key list
+///   Phone→ESP: "SAVE"               → "OK RESTART" + reboot
+///   Phone→ESP: "PING"               → "PONG NovaClaw vX.Y.Z"
+fn start_ble_provisioning(nvs_part: EspDefaultNvsPartition) {
+    // BLE setup runs inline — NimBLE owns all objects via Arc/static refs,
+    // callbacks run on NimBLE's internal task, no need for a dedicated thread.
+    info!("BLE: init NimBLE...");
+
+    // Read BLE auth pin from NVS (allow password change via BLE SET ble_pin)
+    let ble_pin = {
+        match EspNvs::new(nvs_part.clone(), NVS_NS, true) {
+            Ok(nvs) => nvs_get(&nvs, "ble_pin").unwrap_or_else(|| BLE_AUTH_PIN_DEFAULT.to_string()),
+            Err(_) => BLE_AUTH_PIN_DEFAULT.to_string(),
+        }
+    };
+    let ble_pin = Arc::new(Mutex::new(ble_pin));
+
+    let device = BLEDevice::take();
+    device
+        .security()
+        .set_auth(esp32_nimble::enums::AuthReq::empty())
+        .set_io_cap(esp32_nimble::enums::SecurityIOCap::NoInputNoOutput);
+
+    let server = device.get_server();
+    let authed: Arc<std::sync::atomic::AtomicBool> =
+        Arc::new(std::sync::atomic::AtomicBool::new(false));
+
+    let authed_conn = authed.clone();
+    server.on_connect(move |_srv, _desc| {
+        authed_conn.store(false, Ordering::SeqCst);
+        info!("BLE: client connected");
+    });
+    let authed_disc = authed.clone();
+    server.on_disconnect(move |_desc, _reason| {
+        authed_disc.store(false, Ordering::SeqCst);
+        info!("BLE: client disconnected");
+    });
+
+    let service = server.create_service(uuid128!(NUS_SERVICE_UUID));
+
+    // TX: ESP -> Phone (notify)
+    let tx_char = service.lock().create_characteristic(
+        uuid128!(NUS_TX_UUID),
+        NimbleProperties::NOTIFY,
+    );
+    tx_char.lock().set_value(b"NovaClaw ready");
+
+    // RX: Phone -> ESP (write)
+    let tx = tx_char.clone();
+    let authed_rx = authed.clone();
+    let nvs_part_inner = nvs_part.clone();
+    let ble_pin_rx = ble_pin.clone();
+    service.lock().create_characteristic(
+                uuid128!(NUS_RX_UUID),
+                NimbleProperties::WRITE | NimbleProperties::WRITE_NO_RSP,
+            ).lock().on_write(move |args| {
+                let raw = String::from_utf8_lossy(args.recv_data()).to_string();
+                let cmd = raw.trim();
+                if cmd.is_empty() { return; }
+                info!("BLE RX: {} bytes", cmd.len());
+
+                // helper: send response via TX notify
+                let respond = |msg: &str| {
+                    tx.lock().set_value(msg.as_bytes());
+                    tx.lock().notify();
+                };
+
+                if cmd.eq_ignore_ascii_case("PING") {
+                    respond(&format!("PONG NovaClaw v{}", FW_VERSION));
+                    return;
+                }
+
+                if let Some(pin) = cmd.strip_prefix("AUTH ").or_else(|| cmd.strip_prefix("auth ")) {
+                    let current_pin = ble_pin_rx.lock().unwrap().clone();
+                    if pin.trim() == current_pin {
+                        authed_rx.store(true, Ordering::SeqCst);
+                        respond("OK");
+                        info!("BLE: auth OK");
+                    } else {
+                        respond("FAIL");
+                        warn!("BLE: auth FAIL");
+                    }
+                    return;
+                }
+
+                if !authed_rx.load(Ordering::SeqCst) {
+                    respond("NEED_AUTH");
+                    return;
+                }
+
+                let nvs_handle = match EspNvs::new(nvs_part_inner.clone(), NVS_NS, true) {
+                    Ok(h) => h,
+                    Err(e) => { respond(&format!("ERR NVS: {}", e)); return; }
+                };
+
+                if cmd.eq_ignore_ascii_case("LIST") {
+                    respond("wifi_ssid,wifi_pass,wifi_ssid2,wifi_pass2,wifi_ssid3,wifi_pass3,\
+                             tg_token,chat_id,gemini_key,model_pref,voice_mode,wake_phrase,ble_pin");
+                    return;
+                }
+
+                if let Some(key) = cmd.strip_prefix("GET ").or_else(|| cmd.strip_prefix("get ")) {
+                    let key = key.trim();
+                    let val = if key == "ble_pin" {
+                        ble_pin_rx.lock().unwrap().clone()
+                    } else {
+                        nvs_get(&nvs_handle, key).unwrap_or_default()
+                    };
+                    let masked = match key {
+                        "tg_token" | "gemini_key" | "wifi_pass" | "wifi_pass2" | "wifi_pass3"
+                        | "wifi_pass4" | "wifi_pass5" | "ble_pin" => {
+                            if val.len() > 8 {
+                                format!("{}...{}", &val[..4], &val[val.len()-4..])
+                            } else if val.is_empty() {
+                                "(empty)".to_string()
+                            } else {
+                                "****".to_string()
+                            }
+                        }
+                        _ => val,
+                    };
+                    respond(&format!("OK {}", masked));
+                    return;
+                }
+
+                if let Some(rest) = cmd.strip_prefix("SET ").or_else(|| cmd.strip_prefix("set ")) {
+                    let rest = rest.trim();
+                    if let Some((key, val)) = rest.split_once(' ') {
+                        let key = key.trim();
+                        let val = val.trim();
+                        // Validate ble_pin: minimum 6 characters
+                        if key == "ble_pin" && val.len() < 6 {
+                            respond("ERR ble_pin 至少 6 字元");
+                            return;
+                        }
+                        match EspNvs::new(nvs_part_inner.clone(), NVS_NS, true) {
+                            Ok(mut nvs_w) => match nvs_w.set_str(key, val) {
+                                Ok(_) => {
+                                    info!("BLE SET {}=<{} chars>", key, val.len());
+                                    // Update runtime BLE pin if changed
+                                    if key == "ble_pin" {
+                                        if let Ok(mut pin) = ble_pin_rx.lock() {
+                                            *pin = val.to_string();
+                                        }
+                                        info!("BLE: auth pin updated (runtime + NVS)");
+                                    }
+                                    respond("OK");
+                                }
+                                Err(e) => respond(&format!("ERR {}", e)),
+                            },
+                            Err(e) => respond(&format!("ERR NVS: {}", e)),
+                        }
+                    } else {
+                        respond("ERR SET <key> <value>");
+                    }
+                    return;
+                }
+
+                if cmd.eq_ignore_ascii_case("SAVE") {
+                    respond("OK RESTART");
+                    std::thread::sleep(Duration::from_millis(300));
+                    unsafe { esp_idf_svc::sys::esp_restart(); }
+                }
+
+                respond("ERR unknown cmd");
+            });
+
+            // Build advertisement data and start advertising
+            let mut adv_data = BLEAdvertisementData::new();
+            adv_data.name(BLE_DEVICE_NAME);
+            adv_data.add_service_uuid(uuid128!(NUS_SERVICE_UUID));
+
+            let adv = device.get_advertising();
+            if let Err(e) = adv.lock().set_data(&mut adv_data) {
+                error!("BLE: set_data failed: {:?}", e);
+            }
+            match adv.lock().start() {
+                Ok(_) => info!("BLE: advertising as '{}' ready", BLE_DEVICE_NAME),
+                Err(e) => error!("BLE: advertising start failed: {:?}", e),
+            }
+}
+
 // ===== Main =====
 
 fn main() -> Result<()> {
@@ -2210,6 +2414,7 @@ fn main() -> Result<()> {
     let peripherals = Peripherals::take()?;
     let sysloop = EspSystemEventLoop::take()?;
     let nvs_part = EspDefaultNvsPartition::take()?;
+    let nvs_part_ble = nvs_part.clone();
     let mut nvs = EspNvs::new(nvs_part.clone(), NVS_NS, true)?;
 
     let cfg = load_config(&mut nvs)?;
@@ -2368,6 +2573,10 @@ fn main() -> Result<()> {
             Err(err) => warn!("Boot camera test failed: {}", err),
         }
     }
+
+    // Start BLE provisioning AFTER camera DMA (needs contiguous internal SRAM)
+    // but BEFORE Telegram TLS / ESP-SR which consume more heap
+    start_ble_provisioning(nvs_part_ble);
 
     // BOOT button (GPIO0) ??Push-to-Talk
     std::thread::Builder::new()
@@ -3454,6 +3663,21 @@ fn handle_text(
     if trimmed.starts_with("/key ") || trimmed == "/key" {
         let arg = trimmed.strip_prefix("/key").unwrap_or("").trim();
         handle_key_command(cfg, nvs, chat_id, arg);
+        return;
+    }
+
+    if trimmed == "/ble" {
+        let _ = send_telegram(&cfg.tg_token, chat_id,
+            &format!("\u{1f4f6} BLE Provisioning\n\n\
+                      裝置名稱: {}\n\
+                      狀態: 廣播中\n\n\
+                      使用 NovaClaw Android App 連線後\n\
+                      輸入密碼即可修改：\n\
+                      • WiFi 設定\n\
+                      • Telegram Token\n\
+                      • Gemini API Key\n\
+                      • Chat ID\n\
+                      • 模型 / 語音模式", BLE_DEVICE_NAME));
         return;
     }
 
